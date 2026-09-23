@@ -17,7 +17,7 @@ FEEDBACK_LOG = DATA_DIR / "feedback_log.csv"
 # Environment
 load_dotenv(PROJECT_ROOT / ".env")
 
-GROQ_API_KEY: str = os.getenv("GROQ_API_KEY_2", "")
+GROQ_API_KEY: str = os.getenv("GROQ_API_KEY_2") or os.getenv("GROQ_API_KEY", "")
 
 # Models selectable from the UI — first entry is the default.
 AVAILABLE_MODELS: list[str] = [

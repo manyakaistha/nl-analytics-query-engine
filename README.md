@@ -13,9 +13,9 @@ This repository is also an experiment in evaluating and improving natural langua
 - [Request and data flow](#request-and-data-flow)
 - [Prompt and SQL safeguards](#prompt-and-sql-safeguards)
 - [Response caching](#response-caching)
+- [Configuration and project layout](#configuration-and-project-layout)
 - [Testing and evaluation](#testing-and-evaluation)
 - [Evaluation findings and changes](#evaluation-findings-and-changes)
-- [Configuration and project layout](#configuration-and-project-layout)
 - [Current limits and next improvements](#current-limits-and-next-improvements)
 
 ## What the application does
@@ -137,59 +137,13 @@ The database profile embedded in the prompt is read from that live connection. I
 
 ## Request and data flow
 
-### Data preparation
+![Application data preparation and query flow](docs/diagrams/application-data-flow.png)
 
-```mermaid
-flowchart LR
-    A["Raw sales and targets CSVs"] --> P["scripts/preprocess.py"]
-    B["Raw dictionary and curated examples"] --> P
-    P --> C["Processed sales and targets CSVs"]
-    P --> D["Processed dictionary and examples"]
-    P --> L["Create feedback_log.csv if absent"]
-    C --> DB["Load into in-memory DuckDB on first use"]
-    DB --> V["Create sales_with_revenue view"]
-    V --> F["Live data profile for prompt"]
-    C --> H["Hash loaded CSV snapshot for cache key"]
-    D --> S["Prompt inputs"]
-```
+### Data preparation
 
 DuckDB loads the processed CSVs on first use. The profile comes from that database connection; the data-version hash identifies the CSV snapshot loaded into the current process. The feedback log is created by preprocessing only when it does not already exist.
 
 ### Per-query path
-
-```mermaid
-flowchart TD
-    U["Browser: question and selected model"] --> A["POST /api/query"]
-    A --> M["Use allowed model or server default"]
-    M --> P["Build prompt from rules, data profile, dictionary, examples, and recent feedback counts"]
-    P --> K["Build cache key from question, prompt, loaded data hash, and model settings"]
-    K --> C{"Successful response cached?"}
-    C -->|Yes| HC["Append SUCCESS history entry"]
-    HC -.-> L
-    HC --> CR["Return cached response: cache_hit=true, attempts=0"]
-    C -->|No| G["Call Groq for structured JSON"]
-    G -->|Valid model output| S{"One SELECT statement?"}
-    G -->|Other generation or parse error| T{"Attempts remain?"}
-    G -->|Groq 429| FL["Append FAILED history entry"]
-    FL -.-> L
-    S -->|No| T
-    S -->|Yes| D["Execute SQL in DuckDB"]
-    D -->|SQL error| T
-    D -->|SQL succeeds, even with zero rows| O["Format result rows with model explanation"]
-    T -->|Yes: send error context| G
-    T -->|No| FL
-    O --> SL["Append SUCCESS history entry"]
-    SL -.-> L
-    SL --> ST["Store successful response if within cache limit"]
-    ST --> R["Return response"]
-    FL --> R
-    CR --> U
-    R --> U
-    U -->|Optional thumbs feedback| FB["POST /api/feedback"]
-    FB --> UP["Update matching history entry"]
-    UP --> L["feedback_log.csv"]
-    L -.->|Aggregate counts on later requests| P
-```
 
 The main query path is:
 
@@ -200,6 +154,8 @@ The main query path is:
 5. Generation, parsing, guard, and DuckDB errors can trigger another Groq attempt with error context, up to three total attempts. A Groq 429 stops immediately. When attempts are exhausted, the engine logs failure and returns an error response.
 6. On successful SQL execution, the engine formats the returned rows, appends a successful history entry, and caches the response if it meets the cache size limit. The model already supplied the explanation before seeing the result rows.
 7. Optional thumbs feedback updates the matching history entry in `feedback_log.csv`. Future prompts receive aggregate error and negative-feedback counts, rather than raw query or SQL text.
+
+An [editable Excalidraw version](docs/diagrams/application-data-flow.excalidraw) combines the preparation and query paths on one canvas. The [clipboard JSON](docs/diagrams/application-data-flow.clipboard.json) contains the same elements for pasting into Excalidraw.
 
 ## Prompt and SQL safeguards
 
@@ -245,6 +201,54 @@ This means casing and punctuation remain significant, while whitespace-only diff
 - A changed prompt, feedback context, data file, model, temperature, or token limit creates a different key and therefore misses.
 
 The cache stores the response, including the generated SQL and result. It does not cache database state independently. The source CSV hash identifies the loaded snapshot; after changing CSV data, rerun preprocessing and restart the application so DuckDB loads the updated files.
+
+## Configuration and project layout
+
+```text
+.
+├── main.py                       # Uvicorn entry point
+├── app/
+│   ├── server.py                 # FastAPI routes and UI serving
+│   ├── engine.py                 # Prompt, cache, model, SQL, retry orchestration
+│   ├── llm.py                    # Groq client and structured JSON parsing
+│   ├── prompts.py                # Prompt rules, examples, and live data profile
+│   ├── database.py               # DuckDB setup, snapshot hash, SELECT guard
+│   ├── cache.py                  # Bounded process-local LRU response cache
+│   ├── feedback.py               # Query history and user feedback
+│   ├── models.py                 # Pydantic request and response models
+│   └── config.py                 # Paths, API key, model and cache settings
+├── data/
+│   ├── sales_data.csv            # Source sales data
+│   ├── targets.csv               # Source monthly regional targets
+│   ├── data_dictionary.json      # Metric and synonym definitions
+│   ├── nl_queries.json           # Original examples
+│   ├── nl_queries_curated.json   # Reviewed few-shot examples
+│   └── processed/                # Generated inputs and feedback log
+├── scripts/
+│   └── preprocess.py             # Normalize and validate source files
+├── static/
+│   └── index.html                # Browser chat application
+└── tests/
+    ├── test_regressions.py       # Deterministic guard/cache/evaluator tests
+    └── eval/
+        ├── queries.yaml          # Tiered evaluation catalog and oracles
+        ├── run_eval.py            # Full run with Gemini judging
+        ├── run_groq_eval.py       # Groq run with local oracle scoring
+        └── traces/                # Saved responses, scores, and summaries
+```
+
+Important settings in `app/config.py`:
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `GROQ_API_KEY_2` | Empty | Groq API key read from `.env` |
+| `GROQ_MODEL` | `openai/gpt-oss-120b` | Default model; users can select GPT OSS 120B, GPT OSS 20B, or Qwen 3.8 27B in the UI |
+| `GROQ_TEMPERATURE` | `0.1` | Generation temperature |
+| `GROQ_MAX_TOKENS` | `2048` | Maximum model response tokens |
+| `MAX_SELF_CORRECT_ATTEMPTS` | `3` | Maximum generation/execution attempts |
+| `QUERY_CACHE_MAX_ENTRIES` | `128` | LRU entry limit |
+| `QUERY_CACHE_MAX_ENTRY_BYTES` | `262144` | Maximum serialized response size |
+
 
 ## Testing and evaluation
 
@@ -400,53 +404,6 @@ To regenerate the chart files from the saved traces, run `uv run python scripts/
 ### Application smoke test and regressions
 
 The app was started locally and checked through its HTTP routes. The UI returned 200; a total-sales request returned `6134.4`; a whitespace-only repeat returned the same answer as a cache hit; and a paraphrase generated a fresh response. Feedback submission succeeded, and an empty query returned HTTP 422. The 12-test regression suite passed after the cache implementation. This smoke test checked key flows and is separate from the 30-case model evaluation.
-
-## Configuration and project layout
-
-```text
-.
-├── main.py                       # Uvicorn entry point
-├── app/
-│   ├── server.py                 # FastAPI routes and UI serving
-│   ├── engine.py                 # Prompt, cache, model, SQL, retry orchestration
-│   ├── llm.py                    # Groq client and structured JSON parsing
-│   ├── prompts.py                # Prompt rules, examples, and live data profile
-│   ├── database.py               # DuckDB setup, snapshot hash, SELECT guard
-│   ├── cache.py                  # Bounded process-local LRU response cache
-│   ├── feedback.py               # Query history and user feedback
-│   ├── models.py                 # Pydantic request and response models
-│   └── config.py                 # Paths, API key, model and cache settings
-├── data/
-│   ├── sales_data.csv            # Source sales data
-│   ├── targets.csv               # Source monthly regional targets
-│   ├── data_dictionary.json      # Metric and synonym definitions
-│   ├── nl_queries.json           # Original examples
-│   ├── nl_queries_curated.json   # Reviewed few-shot examples
-│   └── processed/                # Generated inputs and feedback log
-├── scripts/
-│   └── preprocess.py             # Normalize and validate source files
-├── static/
-│   └── index.html                # Browser chat application
-└── tests/
-    ├── test_regressions.py       # Deterministic guard/cache/evaluator tests
-    └── eval/
-        ├── queries.yaml          # Tiered evaluation catalog and oracles
-        ├── run_eval.py            # Full run with Gemini judging
-        ├── run_groq_eval.py       # Groq run with local oracle scoring
-        └── traces/                # Saved responses, scores, and summaries
-```
-
-Important settings in `app/config.py`:
-
-| Setting | Default | Meaning |
-|---|---|---|
-| `GROQ_API_KEY_2` | Empty | Groq API key read from `.env` |
-| `GROQ_MODEL` | `openai/gpt-oss-120b` | Default model; users can select GPT OSS 120B, GPT OSS 20B, or Qwen 3.8 27B in the UI |
-| `GROQ_TEMPERATURE` | `0.1` | Generation temperature |
-| `GROQ_MAX_TOKENS` | `2048` | Maximum model response tokens |
-| `MAX_SELF_CORRECT_ATTEMPTS` | `3` | Maximum generation/execution attempts |
-| `QUERY_CACHE_MAX_ENTRIES` | `128` | LRU entry limit |
-| `QUERY_CACHE_MAX_ENTRY_BYTES` | `262144` | Maximum serialized response size |
 
 ## Current limits and next improvements
 
