@@ -67,7 +67,6 @@ From the repository root:
 
 ```bash
 uv sync
-cp .env.example .env
 ```
 
 Edit `.env` and set the key expected by the current configuration:
