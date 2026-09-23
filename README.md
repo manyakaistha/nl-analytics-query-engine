@@ -84,7 +84,7 @@ GROQ_MODEL=openai/gpt-oss-120b
 
 Do not commit `.env` or put API keys in source code. The app loads `.env` from the repository root when `app.config` is imported.
 
-Prepare the processed data files:
+Prepare the processed data files (optional; the app also creates missing processed files on first query):
 
 ```bash
 uv run python scripts/preprocess.py
@@ -128,7 +128,7 @@ Source files live under `data/`:
 
 `scripts/preprocess.py` removes common spreadsheet export issues such as byte-order marks, inconsistent line endings, and rows wrapped in quotes. It writes cleaned files to `data/processed/` and creates an empty feedback log if needed. The script deliberately uses `nl_queries_curated.json` for processed examples; the raw example file contains pseudo-SQL and an incorrect average-order-value formula.
 
-On first database use, `app/database.py` loads the processed CSVs into an in-memory DuckDB connection. It creates `sales_with_revenue`, a view that adds:
+On first database use, `app/database.py` creates any missing processed files from the tracked source files, then loads the processed CSVs into an in-memory DuckDB connection. File locations are resolved from the repository location, so the app also works when cloned to a different directory or launched from another working directory. It creates `sales_with_revenue`, a view that adds:
 
 - `revenue = quantity * unit_price * (1 - discount)`
 - `order_month`, formatted as `YYYY-MM`

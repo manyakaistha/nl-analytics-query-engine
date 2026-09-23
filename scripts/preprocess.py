@@ -26,6 +26,42 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RAW_DATA_DIR = PROJECT_ROOT / "data"
 PROCESSED_DIR = RAW_DATA_DIR / "processed"
+REQUIRED_FILES = (
+    "data_dictionary.json",
+    "nl_queries.json",
+    "sales_data.csv",
+    "targets.csv",
+)
+
+
+def ensure_processed_data() -> None:
+    """Create generated inputs on a fresh clone, without replacing existing files."""
+    missing = [name for name in REQUIRED_FILES if not (PROCESSED_DIR / name).is_file()]
+    if not missing:
+        return
+
+    sources = {
+        "data_dictionary.json": "data_dictionary.json",
+        "nl_queries.json": "nl_queries_curated.json",
+        "sales_data.csv": "sales_data.csv",
+        "targets.csv": "targets.csv",
+    }
+    for name in missing:
+        source = RAW_DATA_DIR / sources[name]
+        if not source.is_file():
+            raise FileNotFoundError(
+                f"Missing project data/{sources[name]}; restore the source file "
+                "or run `uv run python scripts/preprocess.py` after adding it."
+            )
+
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    for name in missing:
+        source = RAW_DATA_DIR / sources[name]
+        destination = PROCESSED_DIR / name
+        if name.endswith(".json"):
+            process_json_file(source, destination)
+        else:
+            process_csv_file(source, destination)
 
 
 def _normalize_text(raw: str) -> str:

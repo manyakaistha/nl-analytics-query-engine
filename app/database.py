@@ -9,6 +9,7 @@ import hashlib
 import duckdb
 
 from app.config import DATA_DIR
+from scripts.preprocess import ensure_processed_data
 
 
 # Module-level connection (singleton per process)
@@ -37,6 +38,7 @@ def _init_database() -> duckdb.DuckDBPyConnection:
     as permanent tables.
     """
     global _data_version
+    ensure_processed_data()
     con = duckdb.connect(database=":memory:")
 
     sales_path = DATA_DIR / "sales_data.csv"
