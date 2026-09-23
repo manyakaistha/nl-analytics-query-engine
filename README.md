@@ -137,38 +137,69 @@ The database profile embedded in the prompt is read from that live connection. I
 
 ## Request and data flow
 
+### Data preparation
+
+```mermaid
+flowchart LR
+    A["Raw sales and targets CSVs"] --> P["scripts/preprocess.py"]
+    B["Raw dictionary and curated examples"] --> P
+    P --> C["Processed sales and targets CSVs"]
+    P --> D["Processed dictionary and examples"]
+    P --> L["Create feedback_log.csv if absent"]
+    C --> DB["Load into in-memory DuckDB on first use"]
+    DB --> V["Create sales_with_revenue view"]
+    V --> F["Live data profile for prompt"]
+    C --> H["Hash loaded CSV snapshot for cache key"]
+    D --> S["Prompt inputs"]
+```
+
+DuckDB loads the processed CSVs on first use. The profile comes from that database connection; the data-version hash identifies the CSV snapshot loaded into the current process. The feedback log is created by preprocessing only when it does not already exist.
+
+### Per-query path
+
 ```mermaid
 flowchart TD
-    U[Browser chat UI] -->|POST /api/query: natural-language question| F[FastAPI]
-    F --> E[Query engine]
-    E --> P[Build prompt: schema, data profile, definitions, examples, feedback counts]
-    P --> C{Successful response in cache?}
-    C -->|Yes| R[Return cached response]
-    C -->|No| G[Groq chat completion: structured JSON]
-    G --> V[Parse and validate model output]
-    V --> S{Single read-only SELECT?}
-    S -->|No or SQL error| X[Retry with error context, up to configured limit]
-    X --> G
-    S -->|Yes| D[Execute against in-memory DuckDB]
-    D --> O[Format result and explanation]
-    O --> L[Append outcome to feedback/history CSV]
-    L --> K[Cache successful response]
-    K --> R
+    U["Browser: question and selected model"] --> A["POST /api/query"]
+    A --> M["Use allowed model or server default"]
+    M --> P["Build prompt from rules, data profile, dictionary, examples, and recent feedback counts"]
+    P --> K["Build cache key from question, prompt, loaded data hash, and model settings"]
+    K --> C{"Successful response cached?"}
+    C -->|Yes| HC["Append SUCCESS history entry"]
+    HC -.-> L
+    HC --> CR["Return cached response: cache_hit=true, attempts=0"]
+    C -->|No| G["Call Groq for structured JSON"]
+    G -->|Valid model output| S{"One SELECT statement?"}
+    G -->|Other generation or parse error| T{"Attempts remain?"}
+    G -->|Groq 429| FL["Append FAILED history entry"]
+    FL -.-> L
+    S -->|No| T
+    S -->|Yes| D["Execute SQL in DuckDB"]
+    D -->|SQL error| T
+    D -->|SQL succeeds, even with zero rows| O["Format result rows with model explanation"]
+    T -->|Yes: send error context| G
+    T -->|No| FL
+    O --> SL["Append SUCCESS history entry"]
+    SL -.-> L
+    SL --> ST["Store successful response if within cache limit"]
+    ST --> R["Return response"]
+    FL --> R
+    CR --> U
     R --> U
-    U -->|Optional thumbs up/down| H[POST /api/feedback]
-    H --> L
+    U -->|Optional thumbs feedback| FB["POST /api/feedback"]
+    FB --> UP["Update matching history entry"]
+    UP --> L["feedback_log.csv"]
+    L -.->|Aggregate counts on later requests| P
 ```
 
 The main query path is:
 
-1. The browser submits a question to `/api/query`.
-2. `app.engine` reads recent feedback counts and builds the system prompt. The prompt includes the schema, current data profile, business definitions, DuckDB notes, and reviewed examples.
-3. The engine checks the response cache using the question and current prompt/data/model settings.
-4. On a miss, `app.llm` calls Groq and parses the requested JSON into a validated model response.
-5. `app.database.execute_sql` accepts exactly one DuckDB `SELECT` statement and executes it against the loaded database. External file and network access are disabled in DuckDB after the CSVs have been loaded.
-6. If generation or execution fails, the engine may send the error and failed SQL back to the model for up to three total attempts. A Groq 429 rate-limit response stops retries immediately.
-7. The engine formats the rows, logs the outcome, and caches successful responses. The UI displays the result, explanation, confidence, SQL, and logic steps.
-8. User feedback is recorded against the matching query and SQL. Future prompts receive aggregate error and negative-feedback counts, rather than raw user-entered queries or SQL.
+1. The browser sends the question and selected model to `/api/query`. The engine uses the selected model if it is in the allowlist; otherwise it uses the server default.
+2. `app.engine` builds the system prompt from static rules, the database profile, the processed dictionary and examples, and recent feedback counts. It then builds a cache key that also includes the loaded data hash and model settings.
+3. On a cache hit, the engine appends a successful history entry and returns the stored answer without calling Groq or executing SQL. The response reports `cache_hit=true` and `attempts=0`.
+4. On a cache miss, `app.llm` calls Groq and validates its structured JSON response. `app.database.execute_sql` accepts exactly one `SELECT` statement and runs it against the loaded DuckDB tables. DuckDB external file and network access are disabled after loading the CSVs.
+5. Generation, parsing, guard, and DuckDB errors can trigger another Groq attempt with error context, up to three total attempts. A Groq 429 stops immediately. When attempts are exhausted, the engine logs failure and returns an error response.
+6. On successful SQL execution, the engine formats the returned rows, appends a successful history entry, and caches the response if it meets the cache size limit. The model already supplied the explanation before seeing the result rows.
+7. Optional thumbs feedback updates the matching history entry in `feedback_log.csv`. Future prompts receive aggregate error and negative-feedback counts, rather than raw query or SQL text.
 
 ## Prompt and SQL safeguards
 
@@ -198,7 +229,7 @@ The cache key is a SHA-256 digest of:
 1. The question with repeated/leading/trailing whitespace collapsed.
 2. The complete assembled system prompt, including current feedback context and prompt examples.
 3. The hash of the loaded sales and target CSV files.
-4. The configured Groq model, temperature, and maximum output tokens.
+4. The resolved Groq model for this request, temperature, and maximum output tokens.
 
 This means casing and punctuation remain significant, while whitespace-only differences are normalized. For example, `"Total sales"` and `"  Total   sales  "` can reuse a response. A paraphrase such as `"What is our total revenue?"` has a different key and calls Groq again. The cache does not attempt semantic matching.
 
