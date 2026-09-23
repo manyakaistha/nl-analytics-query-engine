@@ -6,6 +6,7 @@ with a self-correction retry loop.
 from __future__ import annotations
 
 import time
+import hashlib
 from dataclasses import dataclass, field
 
 from app.cache import cache_response, get_cached_response, make_cache_key
@@ -33,16 +34,18 @@ class _AttemptResult:
     error: str = ""
 
 
-def process_query(user_query: str, model: str | None = None) -> QueryResponse:
+def process_query(
+    user_query: str, model: str | None = None, api_key: str | None = None
+) -> QueryResponse:
     """Run the pipeline and stamp the server-side response time."""
     resolved_model = model if model in AVAILABLE_MODELS else GROQ_MODEL
     start = time.perf_counter()
-    response = _run_pipeline(user_query, resolved_model)
+    response = _run_pipeline(user_query, resolved_model, api_key.strip() if api_key else None)
     response.response_time_ms = int((time.perf_counter() - start) * 1000)
     return response
 
 
-def _run_pipeline(user_query: str, model: str) -> QueryResponse:
+def _run_pipeline(user_query: str, model: str, api_key: str | None = None) -> QueryResponse:
     """
     End-to-end pipeline:
       1. Build system prompt with feedback context
@@ -60,6 +63,10 @@ def _run_pipeline(user_query: str, model: str) -> QueryResponse:
         model=model,
         temperature=GROQ_TEMPERATURE,
         max_tokens=GROQ_MAX_TOKENS,
+        credential_scope=(
+            "user:" + hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+            if api_key else "server"
+        ),
     )
     cached = get_cached_response(cache_key, user_query)
     if cached is not None:
@@ -75,6 +82,7 @@ def _run_pipeline(user_query: str, model: str) -> QueryResponse:
         user_query=user_query,
         system_prompt=system_prompt,
         model=model,
+        api_key=api_key,
     )
 
     if result.success and result.llm_output is not None:
@@ -99,16 +107,16 @@ def _run_pipeline(user_query: str, model: str) -> QueryResponse:
         cache_response(cache_key, response)
     else:
         sql_used = result.llm_output.sql if result.llm_output else ""
-        explanation = (
-            "The Groq model is temporarily at its rate limit. Please retry "
-            "after the quota resets."
-            if result.error.startswith("Groq rate limit")
-            else (
+        if result.error.startswith("Groq rate limit"):
+            explanation = "The Groq model is temporarily at its rate limit. Please retry after the quota resets."
+        elif result.error.startswith("Groq rejected"):
+            explanation = "Check the Groq API key and whether it can access the selected model."
+        else:
+            explanation = (
                 "I was unable to generate a valid SQL query for your question "
                 "after multiple attempts. Please try rephrasing your question "
                 "or check the error details."
             )
-        )
         response = QueryResponse(
             query=user_query,
             generated_sql=sql_used,
@@ -139,6 +147,7 @@ def _self_correct_loop(
     user_query: str,
     system_prompt: str,
     model: str,
+    api_key: str | None = None,
 ) -> _LoopResult:
     """
     Try up to MAX_SELF_CORRECT_ATTEMPTS times to generate valid SQL.
@@ -168,6 +177,7 @@ def _self_correct_loop(
                 system_prompt=system_prompt,
                 user_message=user_message,
                 model=model,
+                api_key=api_key,
             )
             result.llm_output = llm_output
 
@@ -175,9 +185,13 @@ def _self_correct_loop(
             if getattr(exc, "status_code", None) == 429:
                 result.error = "Groq rate limit reached. Please retry after the quota resets."
                 return result
-            result.error = f"LLM generation error: {exc}"
-            print(f"  [Attempt {attempt}] LLM error: {exc}")
-            prior_errors.append(("", str(exc)))
+            if getattr(exc, "status_code", None) in (401, 403):
+                result.error = "Groq rejected the API key or its access to this model."
+                return result
+            safe_error = str(exc).replace(api_key, "[redacted]") if api_key else str(exc)
+            result.error = f"LLM generation error: {safe_error}"
+            print(f"  [Attempt {attempt}] LLM error: {safe_error}")
+            prior_errors.append(("", safe_error))
             continue
 
         # --- Step 2: Execute SQL ---

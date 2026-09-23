@@ -22,6 +22,7 @@ def make_cache_key(
     model: str,
     temperature: float,
     max_tokens: int,
+    credential_scope: str = "server",
 ) -> str:
     """Whitespace-only normalization avoids merging different filter values."""
     payload = [
@@ -31,6 +32,7 @@ def make_cache_key(
         model,
         temperature,
         max_tokens,
+        credential_scope,
     ]
     return hashlib.sha256(
         json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")

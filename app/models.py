@@ -11,6 +11,13 @@ class QueryRequest(BaseModel):
     """Incoming natural-language query from the frontend."""
     query: str = Field(..., min_length=1, max_length=1000, description="Natural language analytics question")
     model: str | None = Field(None, description="Groq model id to use for this query; defaults to server config")
+    api_key: str | None = Field(
+        None,
+        max_length=256,
+        repr=False,
+        exclude=True,
+        description="Optional Groq API key for this request; overrides the server key",
+    )
 
 
 class QueryResponse(BaseModel):

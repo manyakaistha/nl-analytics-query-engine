@@ -56,12 +56,15 @@ def _register_routes(app: FastAPI) -> None:
         execute against DuckDB, and return structured results.
         """
         try:
-            response = process_query(request.query, model=request.model)
+            response = process_query(request.query, model=request.model, api_key=request.api_key)
             return response
         except Exception as exc:
+            detail = str(exc)
+            if request.api_key and request.api_key.strip():
+                detail = detail.replace(request.api_key.strip(), "[redacted]")
             raise HTTPException(
                 status_code=500,
-                detail=f"Query processing failed: {str(exc)}",
+                detail=f"Query processing failed: {detail}",
             )
 
     @app.post("/api/feedback")

@@ -3,11 +3,15 @@
 import unittest
 from unittest.mock import patch
 
+from fastapi.testclient import TestClient
+
 import app.cache as cache
 from app.database import execute_sql, get_connection
 from app.engine import _LoopResult, _self_correct_loop, process_query
 from app.feedback import build_feedback_context
+from app.llm import generate_sql
 from app.models import LLMGeneratedOutput, QueryResponse
+from app.server import create_app
 from tests.eval.run_eval import compare_results, normalize_result
 
 
@@ -73,6 +77,68 @@ class RetryTests(unittest.TestCase):
         self.assertEqual(generate.call_count, 1)
         self.assertEqual(result.attempt_number, 1)
         self.assertNotIn("provider details", result.error)
+
+    def test_rejected_user_key_stops_without_retry(self):
+        class AuthenticationError(Exception):
+            status_code = 401
+
+        with patch("app.engine.generate_sql", side_effect=AuthenticationError("bad credential")) as generate:
+            result = _self_correct_loop("Total sales", "prompt", model="openai/gpt-oss-120b", api_key="fake-user-key")
+        self.assertEqual(generate.call_count, 1)
+        self.assertNotIn("bad credential", result.error)
+
+
+class UserKeyTests(unittest.TestCase):
+    def test_query_route_passes_key_without_echoing_it(self):
+        response = QueryResponse(
+            query="Total sales", generated_sql="SELECT 1", generated_logic="one",
+            result="1", confidence_score=0.9, explanation="one",
+        )
+        with patch("app.server.process_query", return_value=response) as process:
+            result = TestClient(create_app()).post(
+                "/api/query",
+                json={"query": "Total sales", "api_key": "fake-user-key"},
+            )
+        self.assertEqual(result.status_code, 200)
+        process.assert_called_once_with("Total sales", model=None, api_key="fake-user-key")
+        self.assertNotIn("fake-user-key", result.text)
+
+    def test_supplied_key_uses_request_client(self):
+        with patch("app.llm.Groq") as client_factory, patch("app.llm._get_client") as server_client:
+            client_factory.return_value.chat.completions.create.return_value.choices[0].message.content = (
+                '{"logic":"one", "sql":"SELECT 1", "explanation":"one", "confidence":0.9}'
+            )
+            generate_sql("prompt", "question", api_key="fake-user-key")
+        client_factory.assert_called_once_with(api_key="fake-user-key")
+        server_client.assert_not_called()
+
+    def test_cache_is_separate_for_each_key(self):
+        cache._entries.clear()
+        success = _LoopResult(
+            success=True,
+            llm_output=LLMGeneratedOutput(
+                sql="SELECT 1", logic="one", explanation="one", confidence=0.9,
+            ),
+            rows=[{"answer": 1}], columns=["answer"], attempt_number=1,
+        )
+        try:
+            with (
+                patch("app.engine.build_feedback_context", return_value=""),
+                patch("app.engine.build_system_prompt", return_value="prompt"),
+                patch("app.engine.get_data_version", return_value="snapshot"),
+                patch("app.engine.append_entry"),
+                patch("app.engine._self_correct_loop", return_value=success) as generate,
+            ):
+                process_query("Total sales", api_key="fake-key-a")
+                process_query("Total sales", api_key="fake-key-b")
+                repeat = process_query("Total sales", api_key="fake-key-a")
+                process_query("Total sales")
+            self.assertEqual(generate.call_count, 3)
+            self.assertTrue(repeat.cache_hit)
+            self.assertNotIn("fake-key-a", repr(cache._entries))
+            self.assertNotIn("fake-key-b", repr(cache._entries))
+        finally:
+            cache._entries.clear()
 
 
 class ResponseCacheTests(unittest.TestCase):

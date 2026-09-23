@@ -68,6 +68,7 @@ def generate_sql(
     system_prompt: str,
     user_message: str,
     model: str = GROQ_MODEL,
+    api_key: str | None = None,
 ) -> LLMGeneratedOutput:
     """
     Call the Groq API and parse the structured JSON output.
@@ -84,20 +85,23 @@ def generate_sql(
     LLMGeneratedOutput
         Parsed and validated response.
     """
-    client = _get_client()
+    # A supplied key belongs to this request. Never replace the shared server
+    # client or put a user's credential in process-wide configuration.
+    client = Groq(api_key=api_key) if api_key else _get_client()
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ],
-        temperature=GROQ_TEMPERATURE,
-        max_tokens=GROQ_MAX_TOKENS,
-        response_format={"type": "json_object"},
-    )
-
-    raw_content = response.choices[0].message.content
-    parsed = _extract_json(raw_content)
-
-    return LLMGeneratedOutput(**parsed)
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+            temperature=GROQ_TEMPERATURE,
+            max_tokens=GROQ_MAX_TOKENS,
+            response_format={"type": "json_object"},
+        )
+        raw_content = response.choices[0].message.content
+        return LLMGeneratedOutput(**_extract_json(raw_content))
+    finally:
+        if api_key:
+            client.close()
