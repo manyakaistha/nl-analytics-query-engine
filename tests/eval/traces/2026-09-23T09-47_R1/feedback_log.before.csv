@@ -1,0 +1,19 @@
+timestamp,query,generated_sql,status,error_message,user_feedback,confidence_score
+2026-09-23T04:05:09.742715+00:00,What is the total sales?,SELECT SUM(revenue) AS total_sales FROM sales_with_revenue;,SUCCESS,,,0.99
+2026-09-23T04:05:19.002080+00:00,How many orders did we get from Consumer customers?,SELECT COUNT(order_id) AS orders FROM sales_with_revenue WHERE customer_segment = 'Consumer';,SUCCESS,,,0.95
+2026-09-23T04:05:28.825952+00:00,Total earnings in EMEA,SELECT SUM(profit) AS total_earnings FROM sales_with_revenue WHERE region = 'EMEA';,SUCCESS,,,0.95
+2026-09-23T04:05:37.987019+00:00,India revenue in March,SELECT SUM(revenue) AS india_march_revenue FROM sales_with_revenue WHERE country = 'India' AND order_month = '2026-03';,SUCCESS,,,0.95
+2026-09-23T04:05:47.513144+00:00,Top 2 cities by profit in each region,"WITH city_profit AS (
+  SELECT region, city, SUM(profit) AS profit
+  FROM sales_with_revenue
+  GROUP BY region, city
+),
+ranked AS (
+  SELECT region, city, profit,
+         ROW_NUMBER() OVER (PARTITION BY region ORDER BY profit DESC) AS rn
+  FROM city_profit
+)
+SELECT region, city, profit
+FROM ranked
+WHERE rn <= 2
+ORDER BY region, profit DESC;",SUCCESS,,,0.95

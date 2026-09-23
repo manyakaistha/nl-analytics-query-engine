@@ -1,0 +1,34 @@
+[
+  {
+    "query": "Total sales in India for March",
+    "expected_logic": "SELECT COALESCE(SUM(revenue), 0) AS total_revenue FROM sales_with_revenue WHERE country = 'India' AND order_month = '2024-03';"
+  },
+  {
+    "query": "Top 2 cities by profit",
+    "expected_logic": "SELECT city, SUM(profit) AS total_profit FROM sales_data GROUP BY city ORDER BY total_profit DESC LIMIT 2;"
+  },
+  {
+    "query": "Average order value by region",
+    "expected_logic": "SELECT region, SUM(revenue) / COUNT(DISTINCT order_id) AS aov FROM sales_with_revenue GROUP BY region ORDER BY aov DESC;"
+  },
+  {
+    "query": "Which region missed its target in Feb?",
+    "expected_logic": "WITH monthly_sales AS (SELECT region, SUM(revenue) AS actual_revenue FROM sales_with_revenue WHERE order_month = '2024-02' GROUP BY region) SELECT t.region, COALESCE(s.actual_revenue, 0) AS actual_revenue, t.target_revenue FROM targets t LEFT JOIN monthly_sales s ON t.region = s.region WHERE t.month = '2024-02' AND COALESCE(s.actual_revenue, 0) < t.target_revenue ORDER BY t.region;"
+  },
+  {
+    "query": "Sales contribution % by category",
+    "expected_logic": "SELECT product_category, SUM(revenue) / SUM(SUM(revenue)) OVER () * 100 AS contribution_pct FROM sales_with_revenue GROUP BY product_category ORDER BY contribution_pct DESC;"
+  },
+  {
+    "query": "Top product in each region",
+    "expected_logic": "SELECT region, product_name, SUM(revenue) AS total_revenue FROM sales_with_revenue GROUP BY region, product_name QUALIFY RANK() OVER (PARTITION BY region ORDER BY SUM(revenue) DESC) = 1 ORDER BY region;"
+  },
+  {
+    "query": "Monthly revenue with month-over-month change %",
+    "expected_logic": "WITH m AS (SELECT order_month, SUM(revenue) AS total_revenue FROM sales_with_revenue GROUP BY order_month) SELECT order_month, total_revenue, (total_revenue - LAG(total_revenue) OVER (ORDER BY order_month)) / NULLIF(LAG(total_revenue) OVER (ORDER BY order_month), 0) * 100 AS mom_growth_pct FROM m ORDER BY order_month;"
+  },
+  {
+    "query": "Revenue of top 3 customers per region",
+    "expected_logic": "WITH cust AS (SELECT region, customer_id, SUM(revenue) AS customer_revenue FROM sales_with_revenue GROUP BY region, customer_id QUALIFY RANK() OVER (PARTITION BY region ORDER BY SUM(revenue) DESC) <= 3) SELECT region, SUM(customer_revenue) AS top3_customer_revenue FROM cust GROUP BY region ORDER BY region;"
+  }
+]
