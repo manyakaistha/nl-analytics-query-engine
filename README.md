@@ -21,7 +21,6 @@ Requirements: Python 3.10+, [`uv`](https://docs.astral.sh/uv/), and a Groq API k
 
 ```bash
 uv sync
-cp .env.example .env
 ```
 
 Add your key to `.env`:
