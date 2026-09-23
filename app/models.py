@@ -7,10 +7,10 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
-# API schemas
 class QueryRequest(BaseModel):
     """Incoming natural-language query from the frontend."""
     query: str = Field(..., min_length=1, max_length=1000, description="Natural language analytics question")
+    model: str | None = Field(None, description="Groq model id to use for this query; defaults to server config")
 
 
 class QueryResponse(BaseModel):
@@ -24,6 +24,7 @@ class QueryResponse(BaseModel):
     attempts: int = Field(1, description="Number of generation attempts used for this request")
     cache_hit: bool = Field(False, description="Whether this answer came from the app cache")
     response_time_ms: int = Field(0, description="Server-side processing time in milliseconds")
+    model: str = Field("", description="Groq model id used to generate this response")
 
 
 class FeedbackRequest(BaseModel):
@@ -42,7 +43,6 @@ class HistoryEntry(BaseModel):
     confidence_score: float
 
 
-# Internal: LLM structured output
 class LLMGeneratedOutput(BaseModel):
     """
     The JSON structure we instruct the LLM to produce.

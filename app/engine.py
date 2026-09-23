@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 
 from app.cache import cache_response, get_cached_response, make_cache_key
 from app.config import (
+    AVAILABLE_MODELS,
     GROQ_MAX_TOKENS,
     GROQ_MODEL,
     GROQ_TEMPERATURE,
@@ -22,7 +23,6 @@ from app.models import LLMGeneratedOutput, QueryResponse
 from app.prompts import build_system_prompt, build_retry_user_message
 
 
-# Internal result wrapper
 @dataclass
 class _AttemptResult:
     """Tracks the outcome of a single generate-execute attempt."""
@@ -33,17 +33,16 @@ class _AttemptResult:
     error: str = ""
 
 
-# Core pipeline
-
-def process_query(user_query: str) -> QueryResponse:
+def process_query(user_query: str, model: str | None = None) -> QueryResponse:
     """Run the pipeline and stamp the server-side response time."""
+    resolved_model = model if model in AVAILABLE_MODELS else GROQ_MODEL
     start = time.perf_counter()
-    response = _run_pipeline(user_query)
+    response = _run_pipeline(user_query, resolved_model)
     response.response_time_ms = int((time.perf_counter() - start) * 1000)
     return response
 
 
-def _run_pipeline(user_query: str) -> QueryResponse:
+def _run_pipeline(user_query: str, model: str) -> QueryResponse:
     """
     End-to-end pipeline:
       1. Build system prompt with feedback context
@@ -58,7 +57,7 @@ def _run_pipeline(user_query: str) -> QueryResponse:
         question=user_query,
         system_prompt=system_prompt,
         data_version=get_data_version(),
-        model=GROQ_MODEL,
+        model=model,
         temperature=GROQ_TEMPERATURE,
         max_tokens=GROQ_MAX_TOKENS,
     )
@@ -75,11 +74,10 @@ def _run_pipeline(user_query: str) -> QueryResponse:
     result = _self_correct_loop(
         user_query=user_query,
         system_prompt=system_prompt,
+        model=model,
     )
 
-    # Build the response
     if result.success and result.llm_output is not None:
-        # Format result: single scalar vs table
         formatted_result = _format_result(result.rows, result.columns)
 
         response = QueryResponse(
@@ -90,9 +88,8 @@ def _run_pipeline(user_query: str) -> QueryResponse:
             confidence_score=result.llm_output.confidence,
             explanation=result.llm_output.explanation,
             attempts=result.attempt_number,
+            model=model,
         )
-
-        # Log success
         append_entry(
             query=user_query,
             generated_sql=result.llm_output.sql,
@@ -101,7 +98,6 @@ def _run_pipeline(user_query: str) -> QueryResponse:
         )
         cache_response(cache_key, response)
     else:
-        # All attempts failed
         sql_used = result.llm_output.sql if result.llm_output else ""
         explanation = (
             "The Groq model is temporarily at its rate limit. Please retry "
@@ -121,9 +117,8 @@ def _run_pipeline(user_query: str) -> QueryResponse:
             confidence_score=0.0,
             explanation=explanation,
             attempts=result.attempt_number,
+            model=model,
         )
-
-        # Log failure
         append_entry(
             query=user_query,
             generated_sql=sql_used,
@@ -135,8 +130,6 @@ def _run_pipeline(user_query: str) -> QueryResponse:
     return response
 
 
-# Self-correction loop
-
 @dataclass
 class _LoopResult(_AttemptResult):
     attempt_number: int = 1
@@ -145,6 +138,7 @@ class _LoopResult(_AttemptResult):
 def _self_correct_loop(
     user_query: str,
     system_prompt: str,
+    model: str,
 ) -> _LoopResult:
     """
     Try up to MAX_SELF_CORRECT_ATTEMPTS times to generate valid SQL.
@@ -173,6 +167,7 @@ def _self_correct_loop(
             llm_output = generate_sql(
                 system_prompt=system_prompt,
                 user_message=user_message,
+                model=model,
             )
             result.llm_output = llm_output
 
@@ -200,7 +195,6 @@ def _self_correct_loop(
             prior_errors.append((llm_output.sql, error_msg))
             print(f"  [Attempt {attempt}] ✗ SQL error: {error_msg}")
 
-    # All attempts exhausted
     final = _LoopResult(attempt_number=MAX_SELF_CORRECT_ATTEMPTS)
     if prior_errors:
         last_sql, last_err = prior_errors[-1]
@@ -209,8 +203,6 @@ def _self_correct_loop(
         final.llm_output = result.llm_output
     return final
 
-
-# Result formatting
 
 def _format_result(
     rows: list[dict],
@@ -226,7 +218,6 @@ def _format_result(
         return "No results found."
 
     if len(rows) == 1 and len(columns) == 1:
-        # Single scalar value
         val = rows[0][columns[0]]
         return str(val)
 
@@ -236,7 +227,6 @@ def _format_result(
         clean_row = {}
         for k, v in row.items():
             try:
-                # Test JSON serialization
                 import json
                 json.dumps(v)
                 clean_row[k] = v

@@ -13,7 +13,6 @@ from app.config import GROQ_API_KEY, GROQ_MODEL, GROQ_TEMPERATURE, GROQ_MAX_TOKE
 from app.models import LLMGeneratedOutput
 
 
-# Client singleton
 _client: Groq | None = None
 
 
@@ -30,8 +29,6 @@ def _get_client() -> Groq:
     return _client
 
 
-# JSON extraction
-
 def _extract_json(text: str) -> dict:
     """
     Extract a JSON object from the LLM response.
@@ -43,7 +40,6 @@ def _extract_json(text: str) -> dict:
     """
     text = text.strip()
 
-    # Try direct parse first
     try:
         return json.loads(text)
     except json.JSONDecodeError:
@@ -68,11 +64,10 @@ def _extract_json(text: str) -> dict:
     raise ValueError(f"Could not extract valid JSON from LLM response:\n{text[:500]}")
 
 
-# Public API
-
 def generate_sql(
     system_prompt: str,
     user_message: str,
+    model: str = GROQ_MODEL,
 ) -> LLMGeneratedOutput:
     """
     Call the Groq API and parse the structured JSON output.
@@ -92,7 +87,7 @@ def generate_sql(
     client = _get_client()
 
     response = client.chat.completions.create(
-        model=GROQ_MODEL,
+        model=model,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},
@@ -105,5 +100,4 @@ def generate_sql(
     raw_content = response.choices[0].message.content
     parsed = _extract_json(raw_content)
 
-    # Validate with Pydantic — raises ValidationError on bad structure
     return LLMGeneratedOutput(**parsed)

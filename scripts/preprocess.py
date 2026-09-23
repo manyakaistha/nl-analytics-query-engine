@@ -28,19 +28,13 @@ RAW_DATA_DIR = PROJECT_ROOT / "data"
 PROCESSED_DIR = RAW_DATA_DIR / "processed"
 
 
-# Shared helpers
-
 def _normalize_text(raw: str) -> str:
     """Strip BOM and normalize line endings to \\n."""
-    # Remove UTF-8 BOM if present
     if raw.startswith("\ufeff"):
         raw = raw[1:]
-    # Normalize CRLF / CR to LF
     raw = raw.replace("\r\n", "\n").replace("\r", "\n")
     return raw
 
-
-# JSON cleaning
 
 def clean_malformed_json(raw_text: str) -> dict | list:
     """
@@ -105,8 +99,6 @@ def process_json_file(src: Path, dst: Path) -> None:
     print(f"    ✓ Wrote cleaned JSON → {dst.name}")
 
 
-# CSV cleaning
-
 def clean_malformed_csv(raw_text: str) -> str:
     """
     Fix CSVs where each entire row is a single quoted string, e.g.:
@@ -150,7 +142,6 @@ def process_csv_file(src: Path, dst: Path) -> None:
     raw = src.read_text(encoding="utf-8-sig")  # strips BOM
     cleaned = clean_malformed_csv(raw)
 
-    # Validate by parsing
     reader = csv.reader(io.StringIO(cleaned))
     rows = list(reader)
     if rows:
@@ -161,8 +152,6 @@ def process_csv_file(src: Path, dst: Path) -> None:
     dst.write_text(cleaned, encoding="utf-8")
     print(f"    ✓ Wrote cleaned CSV  → {dst.name}")
 
-
-# Main
 
 def main() -> None:
     print("=" * 60)
@@ -176,7 +165,6 @@ def main() -> None:
 
     errors = 0
 
-    # --- JSON files ---
     for fname in ["data_dictionary.json", "nl_queries.json"]:
         # The raw examples contain pseudo-SQL and an incorrect AOV formula.
         # Keep them as source material, but publish the reviewed runnable set.
@@ -194,7 +182,6 @@ def main() -> None:
 
     print()
 
-    # --- CSV files ---
     for fname in ["sales_data.csv", "targets.csv"]:
         src = RAW_DATA_DIR / fname
         dst = PROCESSED_DIR / fname
@@ -207,7 +194,6 @@ def main() -> None:
         else:
             print(f"  [SKIP] {fname} not found")
 
-    # --- Create empty feedback log ---
     feedback_log = PROCESSED_DIR / "feedback_log.csv"
     if not feedback_log.exists():
         feedback_log.write_text(

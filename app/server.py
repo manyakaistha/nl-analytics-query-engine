@@ -9,13 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.config import STATIC_DIR
+from app.config import AVAILABLE_MODELS, GROQ_MODEL, STATIC_DIR
 from app.engine import process_query
 from app.feedback import get_recent_entries, update_user_feedback
 from app.models import FeedbackRequest, HistoryEntry, QueryRequest, QueryResponse
 
-
-# App factory
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
@@ -36,8 +34,6 @@ def create_app() -> FastAPI:
     _register_routes(app)
     return app
 
-
-# Routes
 
 def _register_routes(app: FastAPI) -> None:
 
@@ -60,7 +56,7 @@ def _register_routes(app: FastAPI) -> None:
         execute against DuckDB, and return structured results.
         """
         try:
-            response = process_query(request.query)
+            response = process_query(request.query, model=request.model)
             return response
         except Exception as exc:
             raise HTTPException(
@@ -79,6 +75,11 @@ def _register_routes(app: FastAPI) -> None:
         if not updated:
             return {"status": "not_found", "message": "No matching entry found in log."}
         return {"status": "ok", "message": f"Feedback '{request.feedback}' recorded."}
+
+    @app.get("/api/models")
+    async def get_models():
+        """Return the list of selectable models and the server default."""
+        return {"models": AVAILABLE_MODELS, "default": GROQ_MODEL}
 
     @app.get("/api/history")
     async def get_history():

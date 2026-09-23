@@ -25,9 +25,6 @@ import yaml
 from dotenv import load_dotenv
 from google import genai
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
 API_URL = "http://localhost:8000/api/query"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = PROJECT_ROOT / "data" / "processed"
@@ -37,15 +34,9 @@ QUERIES_FILE = PROJECT_ROOT / "tests" / "eval" / "queries.yaml"
 GEMINI_MODEL = "models/gemini-3.8-flash"
 NUM_KEYS = 4  # GEMINI_API_KEY_0 … GEMINI_API_KEY_3
 
-# ---------------------------------------------------------------------------
-# Logging
-# ---------------------------------------------------------------------------
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Judge prompt
-# ---------------------------------------------------------------------------
 JUDGE_PROMPT = """\
 You are an expert SQL judge evaluating an Intelligent Analytics Query Engine.
 Score explanation quality and SQL quality, and score behaviour correctness when an expected behaviour is provided.
@@ -92,10 +83,6 @@ Return your evaluation as a strictly valid JSON object (no markdown wrapping) in
   "notes": "<string containing your reasoning>"
 }}
 """
-
-# ---------------------------------------------------------------------------
-# Gemini key multiplexer
-# ---------------------------------------------------------------------------
 
 class GeminiPool:
     """Round-robin pool of google.genai clients keyed to GEMINI_API_KEY_0…3."""
@@ -168,10 +155,6 @@ class GeminiPool:
         logger.error(f"  All judge keys exhausted: {last_err}")
         return {"explanation_score": 0, "sql_score": 0, "notes": f"All keys failed: {last_err}"}
 
-# ---------------------------------------------------------------------------
-# DuckDB oracle
-# ---------------------------------------------------------------------------
-
 def setup_duckdb() -> duckdb.DuckDBPyConnection:
     conn = duckdb.connect(database=":memory:")
     sales_csv = DATA_DIR / "sales_data.csv"
@@ -184,17 +167,12 @@ def setup_duckdb() -> duckdb.DuckDBPyConnection:
     )
     return conn
 
-# ---------------------------------------------------------------------------
-# Result normalisation & comparison
-# ---------------------------------------------------------------------------
-
 def normalize_result(res: Any) -> List[tuple]:
     """Convert API result (scalar / list-of-dicts) and oracle result (list-of-tuples)
     into a canonical sorted list of rounded tuples for comparison."""
     if not isinstance(res, list):
         if res == "No results found." or (isinstance(res, str) and res.startswith("Error:")):
             return []
-        # Scalar — wrap
         val = _normalize_value(res)
         return [(val,)]
     normalized = []
@@ -260,7 +238,7 @@ def compare_results(oracle_res: List[tuple], api_res: List[tuple]) -> int:
                 break
 
     if matched > 0:
-        return 15  # partial
+        return 15
     return 0
 
 
@@ -290,10 +268,6 @@ def _vals_close(a: Any, b: Any, tol: float = 0.015) -> bool:
         return math.isclose(a, b, abs_tol=tol)
     return str(a) == str(b)
 
-# ---------------------------------------------------------------------------
-# API caller
-# ---------------------------------------------------------------------------
-
 def call_api(question: str) -> Dict[str, Any]:
     with httpx.Client(timeout=60.0) as client:
         try:
@@ -309,10 +283,6 @@ def call_api(question: str) -> Dict[str, Any]:
                 "attempts": 0,
                 "generated_sql": "",
             }
-
-# ---------------------------------------------------------------------------
-# Main evaluation loop
-# ---------------------------------------------------------------------------
 
 def main() -> None:
     load_dotenv(PROJECT_ROOT / ".env")
@@ -448,10 +418,8 @@ def main() -> None:
 
             time.sleep(2)  # rate-limit spacing
 
-    # ---- Summary ----
     _write_summary(results, target_queries, trace_dir, round_name)
 
-    # Restore feedback log
     if backup_feedback.exists():
         shutil.copy(backup_feedback, feedback_log_path)
 
@@ -478,14 +446,12 @@ def _write_summary(results: list, queries: list, trace_dir: Path, round_name: st
             row[c] = median(per_query[qid][c])
         rows.append(row)
 
-    # scores.csv
     import csv
     with open(trace_dir / "scores.csv", "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=["query_id"] + score_cols)
         w.writeheader()
         w.writerows(rows)
 
-    # summary.md
     totals = [r["total"] for r in rows]
     mean_score = sum(totals) / len(totals) if totals else 0
     pass_rate = sum(1 for t in totals if t >= 80) / len(totals) * 100 if totals else 0

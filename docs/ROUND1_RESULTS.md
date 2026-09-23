@@ -1,5 +1,7 @@
 # Test Campaign Results: Round 1 (Prompt Tuning)
 
+> **Historical report.** This records the early 27-question R1 run and its original interpretation. Its scorer mishandled numeric scalar responses, and T4.6 executed a `DELETE` that changed the shared database for later cases. The run stopped before T4.11–T4.13. For the reconciled stage comparison, charts, fixes and complete 30-question run, use [Evaluation trace and improvement history](EVALUATION_TRACE.md).
+
 I completed the prompt engineering phase and evaluated the model on the expanded 30-query catalog. 
 
 > **Note:** Due to the free-tier quota limits of `gemini-3.8-flash` (20 requests per day per key), the evaluation job hit the hard limit and was killed after evaluating 27 out of 30 queries. However, this is more than enough to prove the efficacy of our prompt tuning!

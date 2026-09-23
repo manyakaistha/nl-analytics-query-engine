@@ -18,7 +18,14 @@ FEEDBACK_LOG = DATA_DIR / "feedback_log.csv"
 load_dotenv(PROJECT_ROOT / ".env")
 
 GROQ_API_KEY: str = os.getenv("GROQ_API_KEY_2", "")
-GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
+# Models selectable from the UI — first entry is the default.
+AVAILABLE_MODELS: list[str] = [
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "qwen/qwen3.8-27b",
+]
+GROQ_MODEL: str = os.getenv("GROQ_MODEL", AVAILABLE_MODELS[0])
 
 # Engine tunables
 MAX_SELF_CORRECT_ATTEMPTS: int = 3

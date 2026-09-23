@@ -12,7 +12,6 @@ from pathlib import Path
 from app.config import FEEDBACK_LOG, FEEDBACK_CONTEXT_LIMIT
 
 
-# Schema
 FIELDNAMES = [
     "timestamp",
     "query",
@@ -23,8 +22,6 @@ FIELDNAMES = [
     "confidence_score",
 ]
 
-
-# Write
 
 def _ensure_log_exists() -> None:
     """Create the feedback log with a header row if it doesn't exist."""
@@ -77,8 +74,6 @@ def update_user_feedback(query: str, generated_sql: str, feedback: str) -> bool:
         _write_all(rows)
     return updated
 
-
-# Read
 
 def _read_all() -> list[dict]:
     """Read all rows from the feedback log."""

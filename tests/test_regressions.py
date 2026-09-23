@@ -69,7 +69,7 @@ class RetryTests(unittest.TestCase):
             status_code = 429
 
         with patch("app.engine.generate_sql", side_effect=RateLimit("provider details")) as generate:
-            result = _self_correct_loop("Total sales", "system prompt")
+            result = _self_correct_loop("Total sales", "system prompt", model="openai/gpt-oss-120b")
         self.assertEqual(generate.call_count, 1)
         self.assertEqual(result.attempt_number, 1)
         self.assertNotIn("provider details", result.error)

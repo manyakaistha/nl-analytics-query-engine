@@ -48,13 +48,11 @@ def _init_database() -> duckdb.DuckDBPyConnection:
             for chunk in iter(lambda: source.read(1024 * 1024), b""):
                 digest.update(chunk)
 
-    # Load sales_data
     con.execute(f"""
         CREATE TABLE sales_data AS
         SELECT * FROM read_csv_auto('{sales_path}', header=true)
     """)
 
-    # Load targets
     con.execute(f"""
         CREATE TABLE targets AS
         SELECT * FROM read_csv_auto('{targets_path}', header=true)
