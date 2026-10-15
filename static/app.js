@@ -63,8 +63,9 @@
         sessionHistory = turns.slice(-10);
         writeStorage('sessionStorage', HISTORY_STORAGE_KEY, JSON.stringify(sessionHistory));
         [...chatContainer.children].forEach(child => { if (child !== welcomeMessage) child.remove(); });
-        welcomeMessage.hidden = !sessionHistory.length;
+        welcomeMessage.hidden = sessionHistory.length > 0;
         sessionHistory.forEach(data => { appendMessage('user', data.query); appendAIResponse(data); });
+        chatContainer.scrollTop = 0;
         return true;
     }
 
@@ -588,4 +589,3 @@
     // Boot
     // -----------------------------------------------------------------------
     init();
-    

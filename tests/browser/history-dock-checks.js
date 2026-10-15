@@ -22,6 +22,7 @@
         check(document.querySelector('#recent-chat-list .history-chat-title').textContent === 'History fixture 8', 'Newest completed chat comes first.');
         newChat();
         check(document.querySelectorAll('#recent-chat-list .history-chat').length === 6, 'New chat must preserve previous chats.');
+        check(!document.getElementById('welcome-message').hidden, 'New chat must show the welcome screen.');
         document.getElementById('history-more').click();
         const dialog = document.getElementById('chat-history-dialog');
         check(dialog.open, 'The plus button must open the history dialog.');
@@ -34,6 +35,8 @@
         check(!dialog.open, 'Selecting a chat must close the dialog.');
         check(sessionHistory[0].query === 'History fixture 1', 'Selecting history must restore its answers.');
         check(document.getElementById('chat-container').innerText.includes('Offline history interaction check.'), 'Restored answers must render.');
+        check(document.getElementById('welcome-message').hidden, 'Opening a saved chat must hide the new-chat welcome screen.');
+        check(getComputedStyle(document.getElementById('welcome-message')).display === 'none', 'The welcome screen must not occupy space above saved messages.');
         historyDock.record([...sessionHistory, fixture('continued')]);
         check(JSON.parse(sessionStorage.getItem(keys[0])).chats.length === 8, 'Continuing a chat must update it, not duplicate it.');
         check(document.querySelector('#recent-chat-list .history-chat-meta').textContent.startsWith('2 questions'), 'Conversation metadata must reflect its turns.');
