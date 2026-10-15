@@ -1,132 +1,203 @@
 # Analytics Query Engine
 
-Ask a business question in plain language, inspect the generated SQL, and explore the answer. The Analytics Query Engine combines Groq with a restricted DuckDB executor and a lightweight, accessible HTML/CSS/JavaScript interface.
+**Ask in plain language. Inspect the SQL. Verify the answer.**
 
-**Live demo:** deployment pending — add the Render URL here after verification.
+A natural-language analytics workspace built with FastAPI, Groq and DuckDB. Explore synthetic sales data through a chat interface with transparent calculations, bounded query execution and session-scoped caching.
 
-> This application uses a fully synthetic demonstration dataset. No real customer or company sales data is used.
+[Interface tour](#interface-tour) · [Quick start](#quick-start) · [Dataset](#dataset) · [Evaluation](#evaluation) · [Deploy](#deploy-on-render)
 
-![Analytics Query Engine home](docs/screenshots/analytics-home.png)
+![Analytics Query Engine home with suggested questions, model selector and glass sidebar](docs/screenshots/current/home.png)
 
-The screenshot is from the running local interface. [Target comparison screenshot](docs/screenshots/analytics-targets.png) uses an explicitly mocked model response and real DuckDB results; it is not evidence of live model accuracy.
+*The current workspace: suggested business questions, model selection and recent conversations in a warm glass interface.*
 
-## What it does
+## What you can do
 
-- Converts natural-language questions into SQL using a configurable Groq model.
-- Answers revenue, profit, product, customer, and monthly target questions.
-- Shows reproducible SQL, result tables, deterministic explanations, timings, and CSV export.
-- Enforces SQL, request, result-size, concurrency, and AI budget limits on the server.
-- A floating glass panel shows the last six chats; “+” opens a searchable history of up to 30 conversations. History stays in this browser tab, and opening a saved chat makes no AI request. Feedback uses temporary session-bound receipts.
-- Preserves the original interface, warm palette, typography and chat controls alongside the Python / FastAPI / DuckDB / Groq architecture. Fonts, compiled styles and SQL libraries are served locally; no frontend framework or runtime CDN is required.
+- **Ask business questions:** revenue, products, customers, margins and monthly targets.
+- **Inspect the calculation:** generated SQL, result tables, grounded explanations, timings and CSV export.
+- **Continue a conversation:** six recent chats in the floating glass sidebar; searchable history stored in the current browser tab.
+- **Understand the system:** dedicated Data, Architecture and Evaluations pages, with traceable methodology and evidence.
+- **Choose a model:** GPT-OSS 120B, GPT-OSS 20B or Qwen 3.8 27B through Groq. Model access depends on your account.
 
-Try “What is the total revenue?”, “Which region generated the most revenue?”, “What is the average order value?”, or “How does revenue compare with monthly targets?” Model generation can still be wrong; inspect its SQL.
+The frontend uses HTML, CSS and JavaScript with local fonts and libraries. No frontend framework, runtime CDN or separate frontend build server is required.
+
+## Interface tour
+
+### From a question to a verifiable answer
+
+Ask a question, choose a model, and inspect a structured result. Each response exposes its SQL, explanation, confidence and processing time, with CSV export and feedback controls. Repeated questions can use a session-scoped cache.
+
+![Quarterly target attainment result table with APAC, EMEA and NA revenue and targets](docs/screenshots/current/answer.png)
+
+*Example: Q1 target attainment by region. Revenue and target totals come from the bundled synthetic dataset.*
+
+### Inspect the SQL and reasoning
+
+Expand **Generated SQL** to see the formatted, highlighted query and copy it for review. The **Reasoning** panel records the calculation logic returned with the query; it is not a hidden model chain of thought.
+
+![Average order value result with expanded SQL and reasoning](docs/screenshots/current/sql.png)
+
+*Screenshot provenance: query demonstrations use the explicit offline browser fixture with predetermined SQL and real DuckDB execution. The displayed model, confidence and timings are fixture metadata—not measurements of live model inference. [Capture notes](docs/screenshots/current/capture-notes.json).*
+
+### Explore the data, system and evidence
+
+The sidebar connects the workspace with three reference pages. A contents menu tracks reading progress and supports section jumps.
+
+<details>
+<summary><strong>Data — fields, business definitions and coverage</strong></summary>
+
+Understand the 50,000-line dataset, regional monthly targets, revenue calculations and limits before interpreting an answer.
+
+![Data page showing synthetic dataset scope and summary statistics](docs/screenshots/current/data.png)
+
+</details>
+
+<details>
+<summary><strong>Architecture — follow the inference and execution path</strong></summary>
+
+Explore the eight-stage flow from question to grounded result. Select a stage, pause playback, or switch to the cache-hit path. The animation is illustrative and makes no provider calls.
+
+![Architecture page showing the query pipeline from browser through Groq and read-only DuckDB execution](docs/screenshots/current/architecture.png)
+
+</details>
+
+<details>
+<summary><strong>Evaluations — inspect recorded results and their limits</strong></summary>
+
+Review the historical model campaign, known failures, current offline checks and source artifacts. Historical scores and mocked API benchmarks are labeled separately from live model accuracy.
+
+![Evaluations page with current offline checks and local mocked API benchmark](docs/screenshots/current/evaluations.png)
+
+</details>
+
+## Quick start
+
+Requires **Python 3.10+** and [uv](https://docs.astral.sh/uv/).
+
+```bash
+git clone https://github.com/manyakaistha/nl-analytics-query-engine-.git
+cd nl-analytics-query-engine-
+uv sync --no-group evaluation
+cp .env.example .env
+```
+
+Set `GROQ_API_KEY` in `.env`, then start the app:
+
+```bash
+uv run --no-group evaluation python main.py
+```
+
+Open **http://localhost:8000**. Try:
+
+> Which region missed its target in February?
+
+The interface and `/healthz` work without a key; AI queries require one. Keep the key server-side. Visitors do not supply credentials. Review the credential rotation note in [the deployment guide](docs/DEPLOYMENT_RENDER.md) before publishing.
 
 ## Dataset
 
-| Property | Validated value |
+All customers, transactions, prices and targets are **synthetic**.
+
+| Scope | Value |
 |---|---|
-| Order lines / distinct orders | 50,000 / 33,347 |
-| Distinct customers / repeat customers | 8,424 / 6,584 |
-| Coverage | January 1–March 31, 2024 |
+| Sales line items | 50,000 |
+| Distinct orders / customers | 33,347 / 8,424 |
+| Coverage | January–March 2024 |
 | Regions | APAC, EMEA, NA |
 | Monthly regional targets | 9 |
-| Total revenue | 23,341,186.3890 dataset currency units |
-| Total supplied profit | 3,090,849.13 dataset currency units |
 
-Revenue is `quantity * unit_price * (1 - discount)`; discounts are fractions. Orders and repeat customers use distinct order IDs. Profit is the supplied line value; shipping is a separate line value whose relation to profit is undocumented, so the app does not subtract it again. Currency is unspecified. Target joins aggregate sales by region and month first. There is no historical baseline for year-over-year analysis.
+Revenue is `quantity × unit_price × (1 − discount)`. Count distinct order IDs for orders; aggregate sales by region and month before joining targets. Currency is unspecified. Supplied profit is summed directly; shipping is not subtracted again.
 
-The attached CSV bytes are preserved in `data/`. Original small inputs are archived in `data/archive/original/`. On startup, the app validates and loads source CSVs directly into memory; existing processed files cannot override them. Restart after changing the source snapshot. Optional preprocessing refreshes derived outputs using source and output hashes.
+Source CSVs are validated and loaded into memory at startup. Restart after changing the snapshot. These three months do not support year-over-year, churn or lifetime-value conclusions.
 
-## Run locally
+**In the running app:** [About the data](http://localhost:8000/static/data.html) · **Source:** [dataset summary](data/DATASET_SUMMARY.json)
 
-Python 3.10+ and [uv](https://docs.astral.sh/uv/) are required.
-
-```bash
-uv sync --no-group evaluation
-cp .env.example .env
-# Set GROQ_API_KEY in your local .env, or export it in your shell.
-uv run python main.py
-```
-
-Open <http://localhost:8000>. Without a key, the interface and health check still work; AI questions return a clear HTTP 503. Visitors never need to supply a key. `.env` is ignored and no longer tracked; the local file is preserved. Rotate the credential previously committed at `70bd7526d933:.env` before publishing. History was not rewritten.
-
-`GROQ_API_KEY` takes precedence. A non-placeholder `GROQ_API_KEY_2` remains a deprecated fallback for existing local configurations. The public demo rejects keys submitted in API bodies. Advanced local API clients can still use a request-specific key when `DEMO_MODE=false`.
-
-The default is `openai/gpt-oss-120b`; `openai/gpt-oss-20b` and `qwen/qwen3.8-27b` are selectable. Availability was checked against [Groq's model documentation](https://console.groq.com/docs/models); account access and quotas still require a live check. No automatic provider/model fallback occurs.
-
-## Architecture
+## How it works
 
 ```mermaid
 flowchart LR
-    UI[Browser question] --> API[FastAPI: body / rate / concurrency limits]
-    API --> Cache[Session-scoped bounded TTL cache]
-    Cache --> Prompt[Compact schema and verified SQL patterns]
-    Prompt --> Groq[Groq: timeout / daily call budget]
-    Groq --> Guard[SQLGlot AST allowlist]
-    Guard --> DB[DuckDB: external access disabled / interrupt timer]
-    DB --> Result[Bounded results and grounded explanation]
-    Result --> UI
+    Browser[Question] --> API[FastAPI admission controls]
+    API --> Cache{Session cache}
+    Cache -->|Hit| Answer[Results and explanation]
+    Cache -->|Miss| Groq[Groq generates SQL]
+    Groq --> Guard[Parse and SQLGlot validation]
+    Guard --> DB[Read-only DuckDB execution]
+    DB --> Answer
+    Answer --> Browser
 ```
 
-Source data is loaded once per process. SQL must be a single analytical SELECT over approved tables, columns bound by DuckDB, and allowlisted functions. CTEs, joins, aggregates, dates, HAVING, and windows remain supported. The database disables external access and locks configuration after loading. Query execution is serialized to make timer interruption safe. Model and database work run outside the API event loop.
+The prompt supplies schema, metric rules, dataset facts and reviewed SQL examples. SQL must pass a single-query, table and function allowlist before execution. DuckDB disables external access and uses an interrupt timer; results, retries, request rates and concurrent work are bounded.
 
-## Configuration
+The cache includes session, model, prompt and dataset identity. Repeated equivalent questions reuse the saved result; opening chat history makes no model request. History stays in browser session storage, while feedback uses expiring session-bound receipts.
 
-See [.env.example](.env.example) for every supported threshold.
+**In the running app:** [Interactive architecture](http://localhost:8000/static/architecture.html)
 
-| Variable | Default |
-|---|---:|
-| `GROQ_API_KEY` | empty; set server-side |
-| `GROQ_MODEL` | `openai/gpt-oss-120b` |
-| `DEMO_MODE` / `APP_ENV` / `LOG_LEVEL` | `true` / `development` / `info` |
-| `CLIENT_REQUESTS_PER_MINUTE` / `GLOBAL_REQUESTS_PER_MINUTE` | 5 / 30 |
-| `MAX_CONCURRENT_REQUESTS` | 2 |
-| `LLM_DAILY_REQUEST_BUDGET` | 200 provider calls; UTC reset |
-| `MAX_SELF_CORRECT_ATTEMPTS` | 2 total calls, including retries |
-| `GROQ_TIMEOUT_SECONDS` / `SQL_TIMEOUT_SECONDS` | 20 / 3 |
-| `MAX_RESULT_ROWS` / `DUCKDB_MEMORY_MB` | 200 / 192 |
-| `PORT` / `TRUSTED_PROXY_IPS` | 8000 / empty |
+## Evaluation
 
-API bodies are limited to 8 KiB, questions to 1,000 characters, results to 128 KiB / 40 columns, and cached responses to 64 entries of 128 KiB for 15 minutes. Excessive rows produce a request-to-narrow error rather than silently changing analytical aggregates. The browser renders at most 200 rows per answer and ten answers per conversation. Its session-only chat library retains up to 30 conversations, bounded to 2 MiB, with the six most recent shown in the glass panel. “New chat” preserves previous conversations in that tab; closing the tab clears the library.
+The repository separates **historical model behavior** from **current offline software checks**.
 
-## API
+| Evidence | Recorded result | Scope |
+|---|---|---|
+| Complete historical GPT-OSS 120B run | 15/17 exact oracle shapes; 11/13 behavior passes | Original 10-order dataset; one run per question; behavior manually reviewed |
+| Current offline regression suite | 46 passed, no failures or skips | Current 50,000-line dataset; no provider calls |
+| Current SQL validation | 17 oracle queries and 8 curated examples execute | Validates reference SQL, not model generation |
+| Local benchmark | 1.310 ms SQL; 1.966 ms mocked API miss; 0.541 ms hit | Median across case medians, 12 cases × 5 runs; macOS arm64; mocked generation |
 
-| Route | Behavior |
-|---|---|
-| `POST /api/query` | `{ "query": "What is the total revenue?", "model": "openai/gpt-oss-120b" }` |
-| `GET /api/models` | Supported model IDs, default, synthetic scope |
-| `GET /healthz` | Readiness and loaded row count; no credentials |
-| `POST /api/feedback` | `{ "feedback_id": "receipt from query response", "feedback": "positive" }`; session cookie required |
-| `GET /api/history` | HTTP 410; server history is not public |
+**Current live text-to-SQL accuracy and Render latency remain unmeasured.** There is no completed comparison of all three selectable models. Historical results cannot establish current accuracy or a winning model; exact output shape and manual behavior judgments measure different things.
 
-Errors use appropriate 413, 422, 429, 503, or generic 500 responses. Raw provider exceptions and stack traces are not returned. API documentation is disabled in demo mode.
+- [Current evaluation and benchmark artifacts](docs/EVALUATION_CURRENT.md)
+- [Historical campaign, failures and improvements](docs/EVALUATION_TRACE.md)
+- [Complete historical case review](tests/eval/traces/2026-09-23T10-30_groq/combined_review.md)
+- [Question catalog and SQL oracles](tests/eval/queries.yaml)
+- **In the running app:** [Evaluations](http://localhost:8000/static/evaluations.html)
 
-## Tests and evaluation
+Run offline checks:
 
 ```bash
 uv run --no-group evaluation python -m unittest discover -s tests -p 'test_*.py' -v
-uv run python -m scripts.validate_data
-uv run python -m scripts.preprocess
+uv run --no-group evaluation python -m scripts.validate_data
 uv run --no-group evaluation python -m scripts.benchmark --runs 5
 ```
 
-The standard suite needs no key and makes no provider requests. It tests the full dataset, decimal revenue, target joins, stale preprocessing, SQL attacks, actual interruption, provider failures, privacy, limits, cache invalidation, and concurrency. [Evaluation methodology and measured results](docs/EVALUATION_CURRENT.md) distinguish local SQL and mocked API measurements from live generation accuracy. [Historical evaluation](docs/EVALUATION_TRACE.md) describes the old dataset only and is not a current accuracy claim.
+For an intentional live sample, start the app with a valid key, then run `uv run python -m tests.eval.run_groq_eval --ids T1.1 T2.3`. This consumes provider quota. The optional Gemini judge requires the separate `evaluation` dependency group and credentials.
 
-Optional live evaluation makes provider calls and respects the demo's request limit:
+## Configuration
 
-```bash
-uv run python -m tests.eval.run_groq_eval --ids T1.1 T2.3
-# Optional external judge; uses an additional provider and quota:
-uv sync --group evaluation
-uv run --group evaluation python -m tests.eval.run_eval
-```
+See [.env.example](.env.example) for the full configuration.
 
-The Gemini judge is retained as optional developer tooling and excluded from deployment dependencies. No live evaluation was run for this implementation.
+| Setting | Default |
+|---|---|
+| `GROQ_MODEL` | `openai/gpt-oss-120b` |
+| `DEMO_MODE` | `true` |
+| Client / global request rate | 5 / 30 per minute |
+| Concurrent requests | 2 |
+| Provider call budget | 200 per UTC day, per process |
+| Total generation attempts | 2 |
+| Provider / SQL timeout | 20 / 3 seconds |
+| Result cap | 200 rows |
 
-## Deploy and limitations
+The cache, feedback receipts and admission counters are in memory. Use one worker and one instance; restarts reset them. A request-count budget is not a persistent token or monetary budget. Model confidence is self-reported and uncalibrated.
 
-Use the bundled [Render blueprint](render.yaml) or follow [the exact manual setup](docs/DEPLOYMENT_RENDER.md). Review the [implementation report](IMPLEMENTATION_REPORT.md) before publishing.
+## Deploy on Render
 
-One process and one instance are required for the in-memory limits. Daily request counts are not token or monetary budgets and reset on process restarts, including Render cold starts. Configure provider-side quotas too. Proxy headers are ignored by default; visitors may share a rate bucket behind Render's ingress. Trust only verified proxy IP ranges, never arbitrary forwarding headers or `*`.
+The [Render Blueprint](render.yaml) configures one Free Python Web Service:
 
-DuckDB's memory setting does not cap the entire Python process. Interrupts work for the tested queries but cannot make embedded native code a hard OS sandbox. Local benchmarks do not establish performance on Render's smaller CPU. Render Free sleeps after idle periods and loses local changes on restart; see [its current limits](https://render.com/docs/free). Live model quality, deployment, and physical-device checks remain manual steps. The responsive layout was checked in a real 388-pixel browser frame; the preview viewport-resize tool timed out. Confidence is model-reported and uncalibrated. The app is a portfolio demonstration, not a production multi-tenant service.
+1. Commit and push the version you want to deploy.
+2. In Render, choose **New → Blueprint** and connect this repository.
+3. Supply `GROQ_API_KEY` in Render's secret environment settings.
+4. Deploy, verify `/healthz`, then smoke-test a question and a repeated cache hit before sharing the public URL.
+
+Build: `pip install -r requirements.txt` · Start: `python main.py` · Health: `/healthz`.
+
+See [the deployment guide](docs/DEPLOYMENT_RENDER.md) for environment settings and troubleshooting. Render Free sleeps when idle and loses in-memory state on restart. This repository does not yet record a verified public deployment URL.
+
+## Project map
+
+| Path | Purpose |
+|---|---|
+| `app/` | API, prompts, model client, SQL guard, database, cache and limits |
+| `static/` | Chat interface and Data, Architecture and Evaluations pages |
+| `data/` | Synthetic CSV snapshot, summary and reviewed SQL examples |
+| `tests/` | Offline regressions, live evaluation tools and saved traces |
+| `docs/` | Evaluation evidence, benchmarks and deployment instructions |
+| `scripts/` | Validation, preprocessing, benchmarks and chart generation |
+
+The main API routes are `POST /api/query`, `GET /api/models`, `POST /api/feedback` and `GET /healthz`. Public server history is disabled. This is a bounded portfolio demo; generated SQL still needs review, and local measurements are not production guarantees.

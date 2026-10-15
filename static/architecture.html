@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>System Architecture · Analytics Query Engine</title>
+    <meta name="description" content="Follow a question through the analytics engine: admission controls, private caching, Groq, SQL validation, DuckDB, and grounded results.">
+    <link rel="stylesheet" href="/static/vendor/fonts.css">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/glass-theme.css">
+    <link rel="stylesheet" href="/static/architecture.css">
+    <script src="/static/architecture.js" defer></script>
+<link rel="stylesheet" href="/static/page-navigation.css">
+<script src="/static/page-navigation.js" defer></script>
+</head>
+<body class="font-sans architecture-page">
+    <div class="workspace-dock companion-dock"><a title="Chat workspace" class="brand-bubble dock-brand" href="/" aria-label="Analytics Query Engine home"><div class="brand-icon w-9 h-9 rounded-full bg-accent-600 flex items-center justify-center shadow-sm">
+                    <svg aria-hidden="true" class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23.693L5 14.5m14.8.8 1.402 1.402c1.232 1.232.65 3.318-1.067 3.611l-.772.13A18.142 18.142 0 0 1 12 21a18.142 18.142 0 0 1-7.363-1.457l-.772-.13c-1.717-.293-2.3-2.379-1.067-3.61L5 14.5" />
+                    </svg>
+                </div><span class="brand-title">Analytics Query Engine</span></a><nav class="dock-links" aria-label="Workspace navigation"></nav></div>
+    <main class="arch-main">
+        <section class="arch-intro">
+            <p class="arch-eyebrow">BEHIND THE ANSWER</p>
+            <h1>A question goes in.<br><em>A clear answer comes out.</em></h1>
+            <p class="arch-lead">A small, deliberate system. Follow the path from plain language to verifiable SQL — and see the safeguards at each step.</p>
+            <div class="arch-tags"><span class="glass-pill">Python + FastAPI</span><span class="glass-pill">Groq</span><span class="glass-pill">DuckDB</span><span class="glass-pill">Synthetic data only</span></div>
+        </section>
+        <section class="flow-section" aria-labelledby="flow-title">
+            <div class="flow-toolbar">
+                <div><h2 id="flow-title">The life of a question</h2><p>Choose a step to look inside. The animation is illustrative; it makes no AI requests.</p></div>
+                <div class="flow-controls">
+                    <div class="flow-mode glass-pill" role="group" aria-label="Choose a query path"><button id="mode-miss" type="button" aria-pressed="true">New question</button><button id="mode-hit" type="button" aria-pressed="false">Cache hit</button></div>
+                    <button id="flow-play" class="glass-pill arch-link" type="button" aria-label="Pause flow animation">Ⅱ Pause</button>
+                </div>
+            </div>
+            <div id="flow-board" class="flow-board">
+                <canvas id="flow-canvas" aria-hidden="true"></canvas>
+                <ol class="flow-grid" aria-label="Question processing stages">
+                    <li class="flow-slot slot-question"><button class="flow-node" type="button" data-stage="0" aria-pressed="true"><span class="node-top"><span>01 / BROWSER</span><span aria-hidden="true">↗</span></span><strong>Your question</strong><span>Plain language, one business question.</span><small>HTML · CSS · JavaScript</small></button></li>
+                    <li class="flow-slot slot-api"><button class="flow-node" type="button" data-stage="1" aria-pressed="false"><span class="node-top"><span>02 / ADMISSION</span><span aria-hidden="true">⊞</span></span><strong>API boundary</strong><span>Validate the request. Check limits.</span><small>FastAPI · server-side controls</small></button></li>
+                    <li class="flow-slot slot-cache"><button class="flow-node" type="button" data-stage="2" aria-pressed="false"><span class="node-top"><span>03 / CONTEXT</span><span aria-hidden="true">◷</span></span><strong>Prompt &amp; cache</strong><span>Ground the question. Reuse safely.</span><small>Schema · dataset · session</small></button></li>
+                    <li class="flow-slot slot-groq"><button class="flow-node" type="button" data-stage="3" aria-pressed="false"><span class="node-top"><span>04 / GENERATION</span><span aria-hidden="true">✧</span></span><strong>Groq inference</strong><span>Generate a candidate SQL query.</span><small>Bounded attempts · API budget</small></button></li>
+                    <li class="flow-slot slot-parse"><button class="flow-node" type="button" data-stage="4" aria-pressed="false"><span class="node-top"><span>05 / STRUCTURE</span><span aria-hidden="true">{ }</span></span><strong>Parse &amp; validate</strong><span>Extract JSON. Check output fields.</span><small>Pydantic · bounded response</small></button></li>
+                    <li class="flow-slot slot-guard"><button class="flow-node" type="button" data-stage="5" aria-pressed="false"><span class="node-top"><span>06 / SQL BOUNDARY</span><span aria-hidden="true">◇</span></span><strong>Read-only guard</strong><span>Allowlisted tables and functions.</span><small>SQLGlot · one SELECT</small></button></li>
+                    <li class="flow-slot slot-db"><button class="flow-node" type="button" data-stage="6" aria-pressed="false"><span class="node-top"><span>07 / EXECUTION</span><span aria-hidden="true">▤</span></span><strong>DuckDB</strong><span>Query the loaded synthetic data.</span><small>Interrupt timer · bounded results</small></button></li>
+                    <li class="flow-slot slot-answer"><button class="flow-node" type="button" data-stage="7" aria-pressed="false"><span class="node-top"><span>08 / ANSWER</span><span aria-hidden="true">✓</span></span><strong>Grounded results</strong><span>Show the numbers and the SQL.</span><small>Tables · explanation · feedback</small></button></li>
+                </ol>
+                <p id="cache-route-note" class="cache-route-note" hidden>Cache hit → saved answer. No new Groq call.</p>
+            </div>
+            <div class="flow-detail glass-pill" aria-labelledby="detail-title">
+                <div class="detail-number" id="detail-number" aria-hidden="true">01</div>
+                <div><p class="arch-eyebrow" id="detail-label">BROWSER</p><h3 id="detail-title">Start with a business question</h3><p id="detail-copy">The browser sends your question and selected model to the same-origin API. The Groq key stays on the server.</p><code id="detail-source">static/app.js → POST /api/query</code></div>
+            </div>
+        </section>
+        <section class="arch-underneath" aria-labelledby="underneath-title">
+            <div class="underneath-heading"><p class="arch-eyebrow">THE QUIET WORK UNDERNEATH</p><h2 id="underneath-title">Built to be understandable.</h2></div>
+            <div class="underneath-grid">
+                <article class="system-note glass-pill"><span class="note-number">01</span><h3>Data loads once.</h3><p>At startup, the app validates 50,000 synthetic order lines and nine regional monthly targets. DuckDB loads source CSVs with decimal money fields, creates the revenue view, then disables external access.</p><code>scripts/validate_data.py · app/database.py</code></article>
+                <article class="system-note glass-pill"><span class="note-number">02</span><h3>Recovery has a limit.</h3><p>Malformed output and correctable SQL errors can trigger a bounded retry. By default, a question gets at most two generation attempts. Unsafe SQL, resource limits, and access/quota failures stop the pipeline.</p><code>app/engine.py · app/llm.py</code></article>
+                <article class="system-note glass-pill"><span class="note-number">03</span><h3>History stays with you.</h3><p>Recent conversations live in browser session storage. The answer cache is scoped to the session, model, prompt and dataset. Feedback uses temporary receipts; there is no public global query history.</p><code>static/history-dock.js · app/cache.py</code></article>
+            </div>
+        </section>
+        <section class="guardrails glass-pill" aria-labelledby="guardrail-title"><div><p class="arch-eyebrow">DEFAULT DEMO LIMITS</p><h2 id="guardrail-title">Useful answers. Bounded work.</h2></div><dl><div><dt>AI requests / client</dt><dd>5 / min</dd></div><div><dt>Concurrent requests</dt><dd>2</dd></div><div><dt>Provider call budget</dt><dd>200 / UTC day</dd></div><div><dt>SQL timer / result cap</dt><dd>3 sec / 200 rows</dd></div></dl><p>Configurable defaults, not live service telemetry. In-memory limits reset on restart; request counts are not token or monetary budgets.</p></section>
+        <footer class="arch-footer"><span>Fully synthetic data · January–March 2024</span><a href="/">Back to the workspace ↗</a></footer>
+    </main>
+</body>
+</html>

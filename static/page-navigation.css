@@ -1,0 +1,65 @@
+/* Companion pages reuse the home sidebar's workspace, brand and pill styles. */
+.companion-dock .dock-brand { text-decoration: none; }
+.companion-dock .dock-link[aria-current=page] { background: linear-gradient(135deg,rgba(255,253,249,.9),rgba(139,90,43,.12)); border-color: rgba(139,90,43,.24); color: #74461f; }
+.architecture-page { padding-left: 266px; }
+.architecture-page .arch-main { padding-top: 115px; }
+@media (min-width: 761px) and (max-width: 1350px) {
+    .architecture-page { padding-left: 80px; }
+}
+@media (max-width: 760px) {
+    .architecture-page { padding-left: 0; }
+    .architecture-page .arch-main { padding-top: 22px; }
+    .companion-dock { position: relative; top: auto; bottom: auto; left: auto; width: auto; margin: 16px; }
+    .companion-dock .dock-brand { display: flex; width: 222px; }
+    .companion-dock .dock-links { position: fixed; z-index: 40; bottom: calc(140px + env(safe-area-inset-bottom)); left: 10px; width: 48px; }
+}
+/* Reading contents uses the same glass material and pill geometry as the left dock. */
+.architecture-page { padding-right: 242px; }
+.reading-dock { position: fixed; z-index: 35; top: 112px; right: 22px; width: 200px; color: #543c29; }
+.reading-heading { display: flex; align-items: center; gap: 9px; padding: 16px 14px; border-radius: 28px; cursor: pointer; list-style: none; }
+.reading-heading::-webkit-details-marker { display: none; }
+.reading-icon { font-size: 22px; line-height: 1; }
+.reading-label { font-family: 'Instrument Serif',serif; font-size: 21px; }
+.reading-percent { margin-left: auto; color: #7b6047; font-size: 10px; font-variant-numeric: tabular-nums; }
+.reading-panel { padding-top: 12px; }
+.reading-progress { display: block; appearance: none; width: calc(100% - 24px); height: 3px; border: 0; border-radius: 3px; margin: 0 12px 13px; background: #e7dac7; color: #8b5a2b; overflow: hidden; }
+.reading-progress::-webkit-progress-bar { background: #e7dac7; }
+.reading-progress::-webkit-progress-value { background: #8b5a2b; border-radius: 3px; }
+.reading-progress::-moz-progress-bar { background: #8b5a2b; border-radius: 3px; }
+.reading-links { display: grid; gap: 10px; max-height: calc(100dvh - 238px); overflow-y: auto; padding: 2px 2px 15px; }
+.reading-link { padding: 14px 13px; gap: 10px; align-items: flex-start; white-space: normal; overflow: visible; font-size: 11px; line-height: 1.6; }
+.reading-number { color: #a88e70; flex: none; font-size: 9px; margin-top: 2px; }
+.reading-link[aria-current=location] { background: linear-gradient(135deg,rgba(255,253,249,.9),rgba(139,90,43,.12)); border-color: rgba(139,90,43,.24); color: #74461f; }
+main h2[id] { scroll-margin-top: 24px; }
+@media (min-width: 761px) and (max-width: 1350px) {
+    .architecture-page { padding-right: 86px; }
+    .reading-dock { width: 60px; right: 12px; }
+    .reading-dock[open] { width: 222px; }
+    .reading-heading { flex-wrap: wrap; justify-content: center; gap: 4px; padding: 12px 10px; }
+    .reading-dock:not([open]) .reading-label { display: none; }
+    .reading-dock:not([open]) .reading-percent { margin-left: 0; }
+    .reading-dock[open] .reading-heading { flex-wrap: nowrap; }
+    .reading-dock[open] .reading-panel { padding: 12px 5px 5px; border-radius: 25px; background: rgba(245,239,230,.94); backdrop-filter: blur(16px); }
+}
+@media (max-width: 760px) {
+    .architecture-page { padding-right: 0; }
+    .reading-dock { width: 54px; top: 104px; right: 16px; }
+    .reading-dock[open] { width: min(300px,calc(100vw - 32px)); }
+    .reading-heading { flex-wrap: wrap; justify-content: center; gap: 4px; padding: 10px 8px; }
+    .reading-dock:not([open]) .reading-label { display: none; }
+    .reading-dock:not([open]) .reading-percent { margin-left: 0; }
+    .reading-dock[open] .reading-heading { flex-wrap: nowrap; }
+    .reading-dock[open] .reading-panel { padding: 12px 5px 5px; border-radius: 25px; background: rgba(245,239,230,.96); backdrop-filter: blur(16px); }
+    .reading-links { max-height: min(65dvh,520px); }
+}
+
+@media (min-width: 1351px) {
+    .reading-dock:not([open]) { width: 60px; }
+    .reading-dock:not([open]) .reading-heading { flex-wrap: wrap; justify-content: center; gap: 4px; padding: 12px 10px; }
+    .reading-dock:not([open]) .reading-label { display: none; }
+    .reading-dock:not([open]) .reading-percent { margin-left: 0; }
+}
+
+.reading-dock { transition: width 280ms var(--bubble-ease); }
+.reading-panel { transform-origin: top right; }
+@media (prefers-reduced-motion: reduce) { .reading-dock { transition: none; } }

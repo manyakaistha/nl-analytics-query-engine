@@ -1,0 +1,65 @@
+/* The history panel's material, shared across the existing interface. */
+:root { --bubble-fill: linear-gradient(135deg,rgba(255,253,249,.46),rgba(255,253,249,.2)); --bubble-edge: rgba(255,255,255,.72); --bubble-shadow: 0 16px 40px -26px rgba(84,60,41,.38),inset 0 1px 9px rgba(255,255,255,.65),inset 0 0 0 1px rgba(139,90,43,.06); --bubble-ease: cubic-bezier(.22,1,.36,1); }
+.brand-bubble,.glass-pill,#app .suggestion-card,#app .composer,#app .glass,#app .rounded-full,#app .sql-block {
+    border: 1px solid var(--bubble-edge); background: var(--bubble-fill); box-shadow: var(--bubble-shadow);
+    -webkit-backdrop-filter: blur(16px) saturate(135%); backdrop-filter: blur(16px) saturate(135%);
+    transition: background 220ms ease,border-color 220ms ease,box-shadow 250ms ease,transform 280ms var(--bubble-ease);
+}
+.brand-bubble:hover,.glass-pill:hover,#app .suggestion-card:hover,#app button.rounded-full:hover:not(:disabled),#app select:hover {
+    background: linear-gradient(135deg,rgba(255,255,255,.68),rgba(255,253,249,.37)); border-color: rgba(255,255,255,.9); transform: translateY(-2px); box-shadow: 0 18px 42px -25px rgba(84,60,41,.42),inset 0 1px 9px rgba(255,255,255,.8);
+}
+#app .chip:hover { background: rgba(255,255,255,.5); border-color: rgba(255,255,255,.65); transform: translateX(2px); }
+#app .composer:focus-within { border-color: rgba(139,90,43,.24); box-shadow: var(--bubble-shadow),0 0 0 3px rgba(139,90,43,.045); }
+#app #send-btn { color: #543c29; background: linear-gradient(135deg,rgba(255,253,249,.64),rgba(139,90,43,.1)); border-color: rgba(139,90,43,.14); }
+#app #model-select { color: #6b4f37; }
+#app #welcome-message > div:first-child { flex-shrink: 0; }
+.brand-bubble > .brand-icon { background: rgba(139,90,43,.1); box-shadow: inset 0 1px 6px rgba(255,255,255,.8); flex: none; }
+.brand-bubble svg { color: #8b5a2b; }
+#app #chat-container > .justify-end > div { background: var(--bubble-fill); color: #543c29; border: 1px solid var(--bubble-edge); box-shadow: var(--bubble-shadow); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+#app .result-table th { background: rgba(243,235,223,.65); }
+#app .result-table tr:hover td { background: rgba(255,255,255,.35); }
+#app .feedback-btn { background: rgba(255,255,255,.24); border: 1px solid rgba(255,255,255,.5); box-shadow: inset 0 1px 5px rgba(255,255,255,.6); }
+#app .feedback-btn:hover { background: rgba(255,255,255,.55); transform: translateY(-1px); }
+.brand-bubble { display: flex; align-items: center; gap: 10px; border-radius: 30px; padding: 13px 12px; text-align: left; color: #543c29; cursor: pointer; }
+.brand-title { font-family: 'Instrument Serif',serif; font-size: 23px; font-weight: 400; line-height: 1.05; margin: 0; }
+.workspace-dock { position: fixed; z-index: 30; top: 24px; left: 22px; width: 222px; display: flex; flex-direction: column; gap: 12px; transition: width 320ms var(--bubble-ease); }
+.workspace-dock #history-dock { position: relative; top: auto; left: auto; transform: none; width: 100%; max-height: calc(100dvh - 380px); }
+.workspace-dock .recent-chat-list { max-height: min(432px,calc(100dvh - 510px)); }
+.dock-links { display: grid; gap: 10px; }
+.dock-link { display: flex; align-items: center; gap: 12px; padding: 15px 18px; border-radius: 28px; color: #543c29; text-decoration: none; font-size: 12px; white-space: nowrap; overflow: hidden; }
+.dock-link > svg { width: 20px; height: 20px; flex: none; }
+.dock-link-arrow { margin-left: auto; color: #7b6047; }
+#app > header { min-height: 92px; justify-content: flex-end; }
+#app .mobile-brand-bubble { display: none; }
+@media (min-width: 761px) and (max-width: 1350px) {
+    .workspace-dock { left: 12px; width: 64px; }
+    .workspace-dock .dock-brand { justify-content: center; padding: 12px 7px; }
+    .workspace-dock .brand-title,.workspace-dock .dock-link > span { display: none; }
+    .workspace-dock .dock-link { justify-content: center; padding: 16px 10px; }
+    .workspace-dock:is(:hover,:focus-within) { width: 242px; }
+    .workspace-dock:is(:hover,:focus-within) .brand-title,.workspace-dock:is(:hover,:focus-within) .dock-link > span { display: block; }
+    .workspace-dock:is(:hover,:focus-within) .dock-brand,.workspace-dock:is(:hover,:focus-within) .dock-link { justify-content: flex-start; }
+    .workspace-dock:is(:hover,:focus-within) #history-dock .history-dock-heading h2,.workspace-dock:is(:hover,:focus-within) #recent-count,.workspace-dock:is(:hover,:focus-within) .history-more-label,.workspace-dock:is(:hover,:focus-within) .history-empty { display: block; }
+    .workspace-dock:is(:hover,:focus-within) #history-dock .history-chat-copy { display: flex; }
+}
+@media (max-width: 760px) {
+    .workspace-dock { top: auto; bottom: calc(175px + env(safe-area-inset-bottom)); left: 10px; width: 48px; gap: 7px; }
+    .workspace-dock .dock-brand { display: none; }
+    .workspace-dock #history-dock { padding: 5px; border-radius: 24px; max-height: none; }
+    .workspace-dock .dock-link { padding: 12px; border-radius: 24px; }
+    .workspace-dock .dock-link > span { display: none; }
+    .dock-links { gap: 7px; }
+    #app > header { justify-content: space-between; gap: 10px; min-height: 0; padding: 12px 16px; }
+    #app .mobile-brand-bubble { display: flex; border-radius: 30px; padding: 8px 11px 8px 8px; }
+    #app .mobile-brand-bubble h1 { font-size: 20px; }
+}
+@media (prefers-reduced-motion: reduce) { .workspace-dock,.brand-bubble,.glass-pill,#app .suggestion-card,#app .composer,#app .glass,#app .rounded-full,#app .sql-block { transition: none; } }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .brand-bubble,.glass-pill,#app .suggestion-card,#app .composer,#app .glass,#app .rounded-full,#app .sql-block { background: #fff9f0; } }
+/* Keep the product name visible even when the history rail is compact. */
+@media (min-width: 761px) and (max-width: 1350px) {
+    .workspace-dock .dock-brand { width: 222px; justify-content: flex-start; padding: 13px 12px; }
+    .workspace-dock .dock-brand .brand-title { display: block; }
+    .workspace-dock:is(:hover,:focus-within) .dock-brand { width: 242px; }
+}
+#app .result-scroll > div { border-color: rgba(255,255,255,.72); background: rgba(255,255,255,.08); }
+@media (max-width: 760px) { .workspace-dock { bottom: calc(140px + env(safe-area-inset-bottom)); } }

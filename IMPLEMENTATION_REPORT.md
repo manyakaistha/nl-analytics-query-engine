@@ -122,3 +122,31 @@ Added `static/history-dock.js` and `static/history-dock.css` as an isolated fron
 The panel collapses to an icon rail on smaller desktops and a glass history control on mobile. Keyboard focus, Escape dismissal, active states, busy-query protection, reduced-motion rules and a non-blur fallback are included. No canvas, animation loop, service or dependency was added.
 
 Verification: all **46 existing offline tests passed** (1.432 seconds), plus **18 browser acceptance assertions** in `tests/browser/history-dock-checks.js`. Checks cover six recent / thirty retained chats, ordering, search, restore without API calls, conversation updates, busy state, safe text rendering and history retained by New chat. Additional browser checks confirmed reload persistence, 16px backdrop blur, Escape/focus restoration and a 388px frame without horizontal page overflow. Browser fixtures were removed and the prior tab history restored after checks. No live Groq requests were made.
+
+## Shared glass styling and architecture page
+
+Created checkpoint commit `c96bda3` before resuming this design update; it contains the completed backend, restored original UI, dataset and Recent chats panel. The local `.env` was not committed and nothing was pushed.
+
+Added `static/glass-theme.css` and updated `static/index.html` to extend the existing history panel's translucent material and hover behavior to cards, composer, model/send controls, result bubbles and other pills. The logo/title sit in their own glass bubble above the sidebar, now positioned at the top-left. The Recent chats module and CSS remain byte-identical to the checkpoint. GitHub and Architecture pills sit below it; repository links follow the configured Git origin.
+
+Added `static/architecture.html`, `static/architecture.css` and `static/architecture.js`. The page uses semantic, selectable HTML stages over a decorative Retina-scaled canvas. Seeded background geometry is generated once, animated packet progress uses elapsed time with clamped deltas and smoothstep easing, and animation stops when paused, hidden or offscreen. New-question and cache-hit routes reflect the implementation; reduced motion uses manual step controls. Startup validation, retries, privacy, resource limits and source modules are explained without making live provider requests.
+
+Verification: **46 offline backend tests passed**, unchanged from the checkpoint. `tests/browser/architecture-checks.js` passed **11 browser assertions** covering stages, details, cache bypass, DPR sizing, moving/paused canvas, overflow and zero API requests. `tests/browser/architecture-responsive-checks.js` passed **7 assertions** for narrow layout and static/manual reduced-motion behavior. The chat UI was checked at 390px with no horizontal overflow, a visible glass title bubble, a compact sidebar and both project links. The original response cache and backend source match checkpoint `c96bda3`; no live Groq call was made.
+
+Added an About the data page and sidebar pill, with verified source counts, field definitions, target join rules, metric formulas and coverage limits. Updated shared styling and generated Tailwind assets to mint green and white; history layout and backend behavior are retained. Checked desktop and 390px data layouts and verified the page totals directly against the CSVs.
+
+Restored the previous warm neutral palette at user request, retaining the Data page, sidebar pill and stable architecture detail layout.
+
+Added a source-linked Evaluations page and sidebar pill, separating historical GPT-OSS 120B evidence from current offline tests/benchmarks and explicitly identifying missing comparative/live evidence. Rewrote README around the product, setup, data, architecture, evaluation and deployment. No live provider evaluation was invoked.
+
+Evaluations page verified at 1100px and 390px: no page overflow, mobile table scrolls within its container, reproduction disclosure opens, and all ten evidence links resolve to existing repository files. Reported benchmark medians were recomputed from the stored JSON; the recorded 46-test result was checked against its output artifact.
+
+Added a shared compact navigation rail to Data, Architecture and Evaluations with direct chat/page/GitHub links, hover/focus expansion and current-page indication. Mobile uses a compact bottom dock with reserved footer space. All three companion layouts checked at 1100px and 390px without horizontal overflow; navigation makes no API calls.
+
+Unified companion-page sidebar with the home page by reusing workspace-dock, dock-brand, dock-links and dock-link styles. Moved each title pill into the sidebar and removed the separate header navigation. Desktop and mobile widths retain shared glass, pill dimensions and responsive behavior; checked 1440px, 1100px and 390px without page overflow.
+
+Added a shared right-hand reading contents dock to the companion pages. It derives anchors from semantic section headings, shows scroll progress, and marks the active section. Wide screens show contents by default; smaller screens use a native expandable disclosure. Verified anchors and open/closed layouts at 1440px, 1100px and 390px without overflow, and confirmed a real section jump updates the URL, scroll position, active entry and progress.
+
+Contents now opens near the page top on all screen sizes and automatically collapses after scrolling beyond 64px. It reopens when returning to the top; manual reopening supports jumps and collapses on continued downward scrolling. Verified top/open, scroll/closed, manual reopen and resumed-scroll collapse in the browser.
+
+Updated README with six fresh screenshots of the running current UI: home, target results, expanded SQL/reasoning, Data, Architecture and Evaluations. Images are preserved under docs/screenshots/current with capture provenance. Query screenshots use the explicit offline fixture and real bundled DuckDB data; no live model inference or quota was used.

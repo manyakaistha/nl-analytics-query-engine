@@ -1,0 +1,17 @@
+.eval-heading { font-family: 'Instrument Serif',serif; font-size: 34px; line-height: 1.2; margin: 0 0 20px; }
+.eval-table-wrap { overflow-x: auto; }
+.eval-table-wrap table { min-width: 640px; }
+.eval-table-wrap th:first-child { width: 19%; }
+.eval-breakdown { margin-top: 20px; }
+.eval-breakdown h3,.data-schema > h3 { font-family: 'Instrument Serif',serif; font-size: 26px; font-weight: 400; margin: 18px 0 12px; }
+.eval-sources { list-style: none; padding: 0; margin: 0; }
+.eval-sources li { border-bottom: 1px solid #e7dac7; }
+.eval-sources a { display: block; padding: 13px 0; font-size: 12px; line-height: 1.7; text-decoration: underline; text-underline-offset: 4px; }
+.eval-sources a:hover { color: #8b5a2b; }
+.eval-reproduce { margin-top: 25px; }
+.eval-reproduce summary { cursor: pointer; font-size: 15px; padding: 10px 0; }
+.eval-reproduce summary::after { content: ' +'; color: #8b5a2b; }
+.eval-reproduce[open] summary::after { content: ' −'; }
+.eval-reproduce pre { background: rgba(255,255,255,.45); padding: 18px; border-radius: 16px; overflow-x: auto; font-size: 11px; }
+.arch-header nav { flex-wrap: wrap; }
+.data-section,.data-schema { scroll-margin-top: 24px; }

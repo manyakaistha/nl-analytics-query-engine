@@ -1,0 +1,38 @@
+{
+  "captured": "2026-10-15",
+  "source": "Running application in the shared T3 browser, offline fixture on port 8001",
+  "provider_calls": 0,
+  "query_results": "Predetermined verified SQL from tests.frontend_fixture; executed by the real DuckDB engine against the bundled synthetic dataset. Displayed model ID, confidence and timing are fixture metadata, not live inference measurements.",
+  "screenshots": [
+    {
+      "file": "home.png",
+      "width": 1280,
+      "height": 1053
+    },
+    {
+      "file": "answer.png",
+      "width": 1280,
+      "height": 1053
+    },
+    {
+      "file": "sql.png",
+      "width": 1280,
+      "height": 1053
+    },
+    {
+      "file": "architecture.png",
+      "width": 1280,
+      "height": 1053
+    },
+    {
+      "file": "evaluations.png",
+      "width": 1280,
+      "height": 1053
+    },
+    {
+      "file": "data.png",
+      "width": 1280,
+      "height": 1053
+    }
+  ]
+}

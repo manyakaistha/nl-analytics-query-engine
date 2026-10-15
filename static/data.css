@@ -1,0 +1,24 @@
+.data-stats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; }
+.data-stats > div { padding: 25px; border-radius: 25px; display: flex; flex-direction: column; gap: 8px; }
+.data-stats strong { font-family: 'Instrument Serif',serif; font-size: 39px; font-weight: 400; }
+.data-stats span,.data-lead { color: #7b6047; font-size: 12px; line-height: 1.9; }
+.data-section { margin-top: 45px; }
+.data-section h2 { font-family: 'Instrument Serif',serif; font-size: 34px; font-weight: 400; line-height: 1.2; margin: 0 0 22px; }
+.data-section .system-note h3 { margin-top: 0; }
+.data-section .system-note p { margin-bottom: 0; }
+.data-schema { padding: 30px; border-radius: 28px; }
+.data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
+.data-table th,.data-table td { border-bottom: 1px solid #e7dac7; padding: 13px 12px; vertical-align: top; line-height: 1.8; }
+.data-table th { font-weight: 500; }
+.data-table td { color: #7b6047; }
+.data-table thead { color: #8b5a2b; }
+.data-table tbody tr:last-child > * { border: 0; }
+.data-page code { font-family: 'JetBrains Mono',monospace; font-size: .88em; overflow-wrap: anywhere; }
+.data-callout { padding: 16px; background: #f3ebdf; border-radius: 16px; color: #6b4f37; font-size: 12px; line-height: 1.8; margin: 20px 0 0; }
+.metric-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.metric-grid > div { padding: 25px; border-radius: 25px; }
+.metric-grid dt { font-family: 'Instrument Serif',serif; font-size: 26px; margin-bottom: 15px; }
+.metric-grid dd { margin: 0; font-size: 12px; color: #6b4f37; line-height: 1.9; }
+.metric-grid p { color: #7b6047; margin-bottom: 0; }
+.data-questions { padding-left: 20px; font-size: 13px; line-height: 2.2; margin-bottom: 25px; }
+@media (max-width: 700px) { .data-stats { grid-template-columns: repeat(2,minmax(0,1fr)); }.metric-grid { grid-template-columns: 1fr; }.data-schema { padding: 22px 16px; }.data-table th,.data-table td { padding: 12px 5px; }.data-table { font-size: 11px; }.data-table th:first-child { width: 38%; }.data-table code { word-break: break-word; }.data-stats > div { padding: 18px; }.data-stats strong { font-size: 33px; } }
