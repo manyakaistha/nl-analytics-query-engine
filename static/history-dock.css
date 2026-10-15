@@ -1,0 +1,64 @@
+/* A separate glass history layer; the original chat surface stays intact. */
+.history-dock {
+    position: fixed; z-index: 30; left: 22px; top: 50%; transform: translateY(-50%);
+    width: 222px; max-height: calc(100dvh - 64px); padding: 13px 9px 9px;
+    border: 1px solid rgba(255,255,255,.72); border-radius: 30px;
+    background: linear-gradient(135deg,rgba(255,253,249,.46),rgba(255,253,249,.2));
+    -webkit-backdrop-filter: blur(16px) saturate(135%); backdrop-filter: blur(16px) saturate(135%);
+    box-shadow: 0 16px 40px -26px rgba(84,60,41,.38), inset 0 1px 9px rgba(255,255,255,.65), inset 0 0 0 1px rgba(139,90,43,.06);
+    color: #543c29; transition: width 320ms cubic-bezier(.22,1,.36,1), box-shadow 240ms ease;
+    overflow: hidden;
+}
+.history-dock-heading { display: flex; align-items: center; gap: 10px; padding: 7px 9px 15px; white-space: nowrap; }
+.history-dock-heading-icon { display: flex; flex: none; width: 24px; height: 24px; color: #7b6047; }
+.history-dock-heading h2 { margin: 0; font-family: 'Instrument Serif',serif; font-size: 22px; font-weight: 400; }
+#recent-count { margin-left: auto; font-size: 10px; font-variant-numeric: tabular-nums; color: #7b6047; }
+.recent-chat-list { display: grid; gap: 4px; max-height: min(432px, calc(100dvh - 210px)); overflow-y: auto; overflow-x: hidden; }
+.history-chat { display: flex; align-items: center; gap: 10px; min-width: 0; width: 100%; padding: 10px 9px; border: 1px solid transparent; border-radius: 19px; background: transparent; color: #543c29; text-align: left; cursor: pointer; transition: background 200ms ease, border-color 200ms ease, transform 240ms cubic-bezier(.22,1,.36,1); }
+.history-chat:hover:not(:disabled) { background: rgba(255,255,255,.5); border-color: rgba(255,255,255,.65); transform: translateX(2px); }
+.history-chat[aria-current] { background: rgba(139,90,43,.1); border-color: rgba(139,90,43,.07); }
+.history-chat:disabled { opacity: .5; cursor: wait; }
+.history-chat-icon { display: flex; align-items: center; justify-content: center; flex: none; width: 25px; height: 30px; color: #8b5a2b; }
+.history-chat-icon svg { width: 19px; height: 19px; }
+.history-chat-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.history-chat-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 500; line-height: 1.5; }
+.history-chat-meta { font-size: 9px; white-space: nowrap; color: #7b6047; }
+.history-empty { margin: 5px 12px 17px; color: #7b6047; font-size: 11px; line-height: 1.8; }
+.history-more { display: flex; align-items: center; justify-content: center; gap: 9px; width: 100%; margin-top: 9px; padding: 9px; border: 1px solid rgba(255,255,255,.62); border-radius: 21px; background: rgba(255,255,255,.26); color: #6b4f37; font-size: 11px; cursor: pointer; transition: background 200ms ease; }
+.history-more:hover { background: rgba(255,255,255,.6); }
+.history-more-icon { display: flex; width: 22px; height: 22px; transition: transform 300ms cubic-bezier(.22,1,.36,1); }
+.history-more[aria-expanded=true] .history-more-icon { transform: rotate(45deg); }
+.history-library { position: fixed; inset: 0; width: min(460px,calc(100vw - 32px)); max-height: min(680px,calc(100dvh - 48px)); margin: auto; padding: 24px; border: 1px solid rgba(255,255,255,.85); border-radius: 30px; background: rgba(255,253,249,.84); color: #543c29; -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); box-shadow: 0 32px 100px -35px rgba(63,44,30,.4), inset 0 1px 6px white; overflow: hidden; }
+.history-library[open] { display: flex; flex-direction: column; animation: history-arrive 280ms cubic-bezier(.22,1,.36,1); }
+.history-library::backdrop { background: rgba(63,44,30,.14); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+.history-library header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.history-library h2 { margin: 0; font-family: 'Instrument Serif',serif; font-size: 32px; font-weight: 400; }
+#history-count { font-size: 11px; color: #7b6047; margin: 5px 0 20px; }
+.history-close { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; border: 1px solid #e7dac7; background: rgba(255,255,255,.5); font-size: 23px; cursor: pointer; }
+.history-search-label { font-size: 10px; color: #7b6047; margin-bottom: 6px; }
+#history-search { width: 100%; padding: 11px 15px; border: 1px solid rgba(139,90,43,.15); border-radius: 16px; background: rgba(255,255,255,.55); color: #543c29; outline-offset: 2px; font: inherit; font-size: 12px; }
+.all-chat-list { overflow-y: auto; margin-top: 15px; min-height: 100px; }
+.all-chat-list .history-chat { padding: 13px 10px; }
+.all-chat-list .history-chat-title { font-size: 13px; }
+.all-chat-list .history-chat-meta { font-size: 10px; }
+.history-library-note { font-size: 10px; color: #7b6047; margin: 18px 0 0; }
+@keyframes history-arrive { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (min-width: 761px) and (max-width: 1350px) {
+    .history-dock { left: 12px; width: 64px; }
+    .history-dock .history-dock-heading { padding-left: 9px; }
+    .history-dock .history-dock-heading h2,.history-dock #recent-count,.history-dock .history-chat-copy,.history-dock .history-more-label,.history-dock .history-empty { display: none; }
+    .history-dock:is(:hover,:focus-within) { width: 242px; }
+    .history-dock:is(:hover,:focus-within) .history-dock-heading h2,.history-dock:is(:hover,:focus-within) #recent-count,.history-dock:is(:hover,:focus-within) .history-more-label,.history-dock:is(:hover,:focus-within) .history-empty { display: block; }
+    .history-dock:is(:hover,:focus-within) .history-chat-copy { display: flex; }
+}
+@media (max-width: 760px) {
+    .history-dock { top: auto; bottom: calc(185px + env(safe-area-inset-bottom)); left: 10px; transform: none; width: 48px; padding: 5px; border-radius: 24px; }
+    .history-dock-heading,.recent-chat-list,.history-more-label { display: none; }
+    .history-more { margin: 0; padding: 6px; border: 0; background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .history-dock,.history-chat,.history-more-icon { transition: none; } .history-library[open] { animation: none; } }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .history-dock,.history-library { background: #fff9f0; } }
+.all-chat-list { overflow-x: hidden; }
+@media (min-width: 761px) and (max-width: 1000px) {
+    #app { margin-left: 76px; margin-right: 0; max-width: calc(100% - 76px); }
+}

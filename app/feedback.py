@@ -1,130 +1,54 @@
-"""
-Feedback log — read/write/append operations on feedback_log.csv.
-"""
+"""Ephemeral feedback receipts. No query text, SQL, IPs, or global history."""
 
-from __future__ import annotations
+import secrets
+import time
+from collections import OrderedDict, Counter
+from threading import Lock
 
-import csv
-from collections import Counter
-from datetime import datetime, timezone
-from pathlib import Path
-
-from app.config import FEEDBACK_LOG, FEEDBACK_CONTEXT_LIMIT
+_lock = Lock()
+_receipts = OrderedDict()
+_counts = Counter()
 
 
-FIELDNAMES = [
-    "timestamp",
-    "query",
-    "generated_sql",
-    "status",
-    "error_message",
-    "user_feedback",
-    "confidence_score",
-]
+def issue_receipt(session: str) -> str:
+    with _lock:
+        now = time.monotonic()
+        for key in list(_receipts):
+            if _receipts[key]["expires"] < now:
+                del _receipts[key]
+        while len(_receipts) >= 256:
+            _receipts.popitem(last=False)
+        token = secrets.token_urlsafe(24)
+        _receipts[token] = {"session": session, "expires": now + 900, "feedback": None}
+        return token
 
 
-def _ensure_log_exists() -> None:
-    """Create the feedback log with a header row if it doesn't exist."""
-    if not FEEDBACK_LOG.exists():
-        FEEDBACK_LOG.parent.mkdir(parents=True, exist_ok=True)
-        with open(FEEDBACK_LOG, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-            writer.writeheader()
+def record_feedback(token: str, session: str, feedback: str) -> bool:
+    with _lock:
+        item = _receipts.get(token)
+        if not item or item["session"] != session or item["expires"] < time.monotonic():
+            return False
+        if item["feedback"]:
+            _counts[item["feedback"]] -= 1
+        item["feedback"] = feedback
+        _counts[feedback] += 1
+        return True
 
 
-def append_entry(
-    query: str,
-    generated_sql: str,
-    status: str,
-    error_message: str = "",
-    user_feedback: str = "",
-    confidence_score: float = 0.0,
-) -> None:
-    """Append a single row to the feedback log."""
-    _ensure_log_exists()
-    with open(FEEDBACK_LOG, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-        writer.writerow({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "query": query,
-            "generated_sql": generated_sql,
-            "status": status,
-            "error_message": error_message,
-            "user_feedback": user_feedback,
-            "confidence_score": confidence_score,
-        })
+def append_entry(**kwargs):
+    """Compatibility hook: requests are deliberately no longer persisted."""
 
 
-def update_user_feedback(query: str, generated_sql: str, feedback: str) -> bool:
-    """
-    Update the user_feedback field for a matching entry.
-    Returns True if a match was found and updated.
-    """
-    _ensure_log_exists()
-    rows = _read_all()
-
-    updated = False
-    for row in reversed(rows):  # Most recent first
-        if row["query"] == query and row["generated_sql"] == generated_sql:
-            row["user_feedback"] = feedback
-            updated = True
-            break
-
-    if updated:
-        _write_all(rows)
-    return updated
+def get_recent_entries(limit=None):
+    return []
 
 
-def _read_all() -> list[dict]:
-    """Read all rows from the feedback log."""
-    _ensure_log_exists()
-    with open(FEEDBACK_LOG, "r", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
-
-
-def _write_all(rows: list[dict]) -> None:
-    """Overwrite the log with the given rows."""
-    with open(FEEDBACK_LOG, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-        writer.writeheader()
-        writer.writerows(rows)
-
-
-def get_recent_entries(limit: int | None = None) -> list[dict]:
-    """Return the most recent N entries (default: FEEDBACK_CONTEXT_LIMIT)."""
-    limit = limit or FEEDBACK_CONTEXT_LIMIT
-    rows = _read_all()
-    return rows[-limit:]
-
-
-def build_feedback_context() -> str:
-    """
-    Summarize recent feedback without placing raw user or model text in the
-    system prompt. Queries, SQL, and DuckDB errors are untrusted content.
-    """
+def build_feedback_context():
+    # Kept for existing regression/evaluation imports; never inject raw content.
     entries = get_recent_entries()
-    if not entries:
-        return ""
     counts = Counter()
     for entry in entries:
-        if entry.get("user_feedback") == "negative":
-            counts["negative feedback"] += 1
-        if entry.get("status") != "FAILED":
-            continue
         error = entry.get("error_message", "").lower()
-        if "read-only" in error or "permission" in error:
-            counts["read-only violation"] += 1
-        elif "binder" in error or "column" in error:
+        if "column" in error or "binder" in error:
             counts["column error"] += 1
-        elif "catalog" in error or "function" in error:
-            counts["function error"] += 1
-        elif "parser" in error or "syntax" in error:
-            counts["syntax error"] += 1
-        else:
-            counts["other failure"] += 1
-
-    if not counts:
-        return ""
-    return "Recent feedback counts (review the schema and dialect rules where relevant):\n" + "\n".join(
-        f"  - {category}: {count}" for category, count in sorted(counts.items())
-    )
+    return "\n".join(f"{key}: {value}" for key, value in counts.items())

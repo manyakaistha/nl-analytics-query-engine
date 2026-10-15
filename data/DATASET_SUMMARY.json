@@ -1,0 +1,75 @@
+{
+  "synthetic": true,
+  "dataset_name": "Synthetic sales and monthly regional targets for NL Analytics Query Engine",
+  "seed": 20241015,
+  "sales_rows": 50000,
+  "distinct_orders": 33347,
+  "distinct_customers": 8424,
+  "customers_with_repeat_orders": 6584,
+  "regions": [
+    "APAC",
+    "EMEA",
+    "NA"
+  ],
+  "period": [
+    "2024-01-01",
+    "2024-03-31"
+  ],
+  "targets_rows": 9,
+  "line_items_by_region_and_month": {
+    "APAC/2024-01": 5440,
+    "APAC/2024-02": 6567,
+    "APAC/2024-03": 8054,
+    "EMEA/2024-01": 4381,
+    "EMEA/2024-02": 5041,
+    "EMEA/2024-03": 6483,
+    "NA/2024-01": 3837,
+    "NA/2024-02": 4517,
+    "NA/2024-03": 5680
+  },
+  "regional_monthly_revenue": {
+    "APAC/2024-01": 2370826.56,
+    "APAC/2024-02": 2912775.42,
+    "APAC/2024-03": 3669464.76,
+    "EMEA/2024-01": 2097876.82,
+    "EMEA/2024-02": 2578535.27,
+    "EMEA/2024-03": 3255544.27,
+    "NA/2024-01": 1735596.56,
+    "NA/2024-02": 2029559.28,
+    "NA/2024-03": 2691007.44
+  },
+  "revenue_target_attainment_pct": {
+    "APAC/2024-01": 93.01,
+    "APAC/2024-02": 106.38,
+    "APAC/2024-03": 97.08,
+    "EMEA/2024-01": 104.74,
+    "EMEA/2024-02": 92.16,
+    "EMEA/2024-03": 102.57,
+    "NA/2024-01": 96.15,
+    "NA/2024-02": 108.71,
+    "NA/2024-03": 89.7
+  },
+  "sales_schema": [
+    "order_id",
+    "order_date",
+    "region",
+    "country",
+    "city",
+    "customer_id",
+    "customer_segment",
+    "product_category",
+    "product_subcategory",
+    "product_name",
+    "quantity",
+    "unit_price",
+    "discount",
+    "shipping_cost",
+    "profit"
+  ],
+  "targets_schema": [
+    "region",
+    "month",
+    "target_revenue"
+  ],
+  "disclaimer": "Every customer, transaction, price, margin, and target is synthetically generated; no real-world sales performance is represented."
+}

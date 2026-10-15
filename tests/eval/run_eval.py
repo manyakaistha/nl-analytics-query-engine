@@ -8,22 +8,26 @@ Gemini API keys are multiplexed round-robin across GEMINI_API_KEY_0..3
 to avoid per-key rate limits.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import math
 import os
 import re
-import shutil
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from google import genai
 
 import duckdb
 import httpx
 import yaml
 from dotenv import load_dotenv
-from google import genai
+
 
 API_URL = "http://localhost:8000/api/query"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -84,10 +88,13 @@ Return your evaluation as a strictly valid JSON object (no markdown wrapping) in
 }}
 """
 
+
 class GeminiPool:
     """Round-robin pool of google.genai clients keyed to GEMINI_API_KEY_0…3."""
 
     def __init__(self) -> None:
+        from google import genai
+
         self._clients: list[genai.Client] = []
         for i in range(NUM_KEYS):
             key = os.environ.get(f"GEMINI_API_KEY_{i}")
@@ -105,9 +112,15 @@ class GeminiPool:
         self._idx += 1
         return client
 
-    def judge(self, question: str, generated_sql: str, explanation: str,
-              result: Any = None, confidence: float = 0,
-              expected_behaviour: str = "") -> Dict[str, Any]:
+    def judge(
+        self,
+        question: str,
+        generated_sql: str,
+        explanation: str,
+        result: Any = None,
+        confidence: float = 0,
+        expected_behaviour: str = "",
+    ) -> Dict[str, Any]:
         prompt = JUDGE_PROMPT.format(
             question=question,
             generated_sql=generated_sql,
@@ -131,7 +144,7 @@ class GeminiPool:
                 )
                 text = resp.text
                 start = text.find("{")
-                end = text.rfind("}") 
+                end = text.rfind("}")
                 if start != -1 and end != -1:
                     return json.loads(text[start : end + 1])
                 return {
@@ -144,34 +157,38 @@ class GeminiPool:
                 err_str = str(exc)
                 if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
                     wait = min(5 * (attempt + 1), 30)
-                    logger.warning(f"  Rate limited, waiting {wait}s before rotating key…")
+                    logger.warning(
+                        f"  Rate limited, waiting {wait}s before rotating key…"
+                    )
                     time.sleep(wait)
                 elif "401" in err_str or "UNAUTHENTICATED" in err_str:
-                    logger.warning(f"  Key auth failed, skipping to next key…")
+                    logger.warning("  Key auth failed, skipping to next key…")
                     time.sleep(0.5)
                 else:
                     logger.warning(f"  Judge call failed ({exc}), rotating key…")
                     time.sleep(1)
         logger.error(f"  All judge keys exhausted: {last_err}")
-        return {"explanation_score": 0, "sql_score": 0, "notes": f"All keys failed: {last_err}"}
+        return {
+            "explanation_score": 0,
+            "sql_score": 0,
+            "notes": f"All keys failed: {last_err}",
+        }
+
 
 def setup_duckdb() -> duckdb.DuckDBPyConnection:
-    conn = duckdb.connect(database=":memory:")
-    sales_csv = DATA_DIR / "sales_data.csv"
-    targets_csv = DATA_DIR / "targets.csv"
-    conn.execute(f"CREATE TABLE sales_data AS SELECT * FROM read_csv_auto('{sales_csv}')")
-    conn.execute(f"CREATE TABLE targets AS SELECT * FROM read_csv_auto('{targets_csv}')")
-    conn.execute(
-        "CREATE VIEW sales_with_revenue AS "
-        "SELECT *, (quantity*unit_price*(1-discount)) as revenue FROM sales_data"
-    )
-    return conn
+    # Share the application's trusted loader and decimal schema, never stale artifacts.
+    from app.database import get_connection
+
+    return get_connection()
+
 
 def normalize_result(res: Any) -> List[tuple]:
     """Convert API result (scalar / list-of-dicts) and oracle result (list-of-tuples)
     into a canonical sorted list of rounded tuples for comparison."""
     if not isinstance(res, list):
-        if res == "No results found." or (isinstance(res, str) and res.startswith("Error:")):
+        if res == "No results found." or (
+            isinstance(res, str) and res.startswith("Error:")
+        ):
             return []
         val = _normalize_value(res)
         return [(val,)]
@@ -190,7 +207,9 @@ def normalize_result(res: Any) -> List[tuple]:
 def _normalize_value(value: Any) -> Any:
     # The API intentionally renders a one-cell result as a string. Convert
     # numeric strings back to numbers for comparison with DuckDB oracle rows.
-    if isinstance(value, str) and re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", value.strip()):
+    if isinstance(value, str) and re.fullmatch(
+        r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", value.strip()
+    ):
         value = float(value)
     return round(value, 2) if isinstance(value, float) else value
 
@@ -268,12 +287,17 @@ def _vals_close(a: Any, b: Any, tol: float = 0.015) -> bool:
         return math.isclose(a, b, abs_tol=tol)
     return str(a) == str(b)
 
+
 def call_api(question: str) -> Dict[str, Any]:
     with httpx.Client(timeout=60.0) as client:
         try:
             resp = client.post(API_URL, json={"query": question})
-            resp.raise_for_status()
-            return resp.json()
+            data = resp.json()
+            if not resp.is_success:
+                data["result"] = "Error: " + str(
+                    data.get("detail", "API request failed")
+                )
+            return data
         except Exception as exc:
             logger.error(f"  API error for '{question}': {exc}")
             return {
@@ -283,6 +307,7 @@ def call_api(question: str) -> Dict[str, Any]:
                 "attempts": 0,
                 "generated_sql": "",
             }
+
 
 def main() -> None:
     load_dotenv(PROJECT_ROOT / ".env")
@@ -294,32 +319,25 @@ def main() -> None:
         catalog = yaml.safe_load(f)["queries"]
 
     # Round 1: Run entire catalog
-    round_name = "R1"
+    round_name = "synthetic-v2"
     target_queries = catalog
 
-    timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M")
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S-%f")
     trace_dir = TRACES_DIR / f"{timestamp}_{round_name}"
     trace_dir.mkdir(parents=True, exist_ok=True)
-
-    # Feedback-log contamination control (§6.3)
-    feedback_log_path = DATA_DIR / "feedback_log.csv"
-    backup_feedback = trace_dir / "feedback_log.before.csv"
-
-    if feedback_log_path.exists():
-        shutil.copy(feedback_log_path, backup_feedback)
-        with open(feedback_log_path, "r") as f:
-            header = f.readline()
-        with open(feedback_log_path, "w") as f:
-            f.write(header)
 
     results: list[dict] = []
     RUNS = 1  # Use 1 run for fast initial baseline; bump to 3 for full eval
 
-    logger.info(f"▶ Starting {round_name}: {len(target_queries)} queries × {RUNS} run(s)")
+    logger.info(
+        f"▶ Starting {round_name}: {len(target_queries)} queries × {RUNS} run(s)"
+    )
 
     for qi, q in enumerate(target_queries, 1):
         for run_idx in range(1, RUNS + 1):
-            logger.info(f"  [{qi}/{len(target_queries)}] {q['id']} run {run_idx}: {q['question']}")
+            logger.info(
+                f"  [{qi}/{len(target_queries)}] {q['id']} run {run_idx}: {q['question']}"
+            )
 
             # ---- Oracle result ----
             oracle_res: list[tuple] = []
@@ -336,13 +354,20 @@ def main() -> None:
             latency_ms = int((time.time() - t0) * 1000)
 
             api_result = api_resp.get("result", [])
-            is_error = isinstance(api_result, str) and api_result.lower().startswith("error")
+            is_error = isinstance(api_result, str) and api_result.lower().startswith(
+                "error"
+            )
             api_norm = normalize_result(api_result) if not is_error else []
 
             # ---- Scoring ----
             scores: Dict[str, int] = {
-                "executes": 0, "correct": 0, "confidence": 0,
-                "explanation": 0, "sql_quality": 0, "efficiency": 0, "total": 0,
+                "executes": 0,
+                "correct": 0,
+                "confidence": 0,
+                "explanation": 0,
+                "sql_quality": 0,
+                "efficiency": 0,
+                "total": 0,
             }
 
             # 1. Executes
@@ -393,8 +418,14 @@ def main() -> None:
             scores["total"] = sum(v for k, v in scores.items() if k != "total")
 
             record = {
-                "round": 0,
-                "prompt_version": "v0",
+                "round": round_name,
+                "prompt_version": "compact-synthetic-v2",
+                "dataset_version": __import__(
+                    "app.database", fromlist=["get_data_version"]
+                ).get_data_version(),
+                "model": api_resp.get("model"),
+                "timings_ms": api_resp.get("timings_ms"),
+                "error_code": api_resp.get("error_code"),
                 "query_id": q["id"],
                 "run": run_idx,
                 "split": q["split"],
@@ -411,27 +442,37 @@ def main() -> None:
             with open(trace_dir / "results.jsonl", "a") as f:
                 f.write(json.dumps(record, default=str) + "\n")
 
-            logger.info(f"    Score: {scores['total']}/100  (exec={scores['executes']} "
-                        f"correct={scores['correct']} conf={scores['confidence']} "
-                        f"expl={scores['explanation']} sql={scores['sql_quality']} "
-                        f"eff={scores['efficiency']})")
+            logger.info(
+                f"    Score: {scores['total']}/100  (exec={scores['executes']} "
+                f"correct={scores['correct']} conf={scores['confidence']} "
+                f"expl={scores['explanation']} sql={scores['sql_quality']} "
+                f"eff={scores['efficiency']})"
+            )
 
-            time.sleep(2)  # rate-limit spacing
+            time.sleep(13)  # Respect public five-per-minute client limit.
 
     _write_summary(results, target_queries, trace_dir, round_name)
-
-    if backup_feedback.exists():
-        shutil.copy(backup_feedback, feedback_log_path)
 
     logger.info(f"✅ {round_name} done — traces at {trace_dir}")
 
 
-def _write_summary(results: list, queries: list, trace_dir: Path, round_name: str) -> None:
+def _write_summary(
+    results: list, queries: list, trace_dir: Path, round_name: str
+) -> None:
     """Write scores.csv and summary.md from the collected results."""
-    score_cols = ["executes", "correct", "confidence", "explanation", "sql_quality", "efficiency", "total"]
+    score_cols = [
+        "executes",
+        "correct",
+        "confidence",
+        "explanation",
+        "sql_quality",
+        "efficiency",
+        "total",
+    ]
 
     # Aggregate per query (median across runs)
     from statistics import median
+
     per_query: dict[str, dict] = {}
     for r in results:
         qid = r["query_id"]
@@ -447,6 +488,7 @@ def _write_summary(results: list, queries: list, trace_dir: Path, round_name: st
         rows.append(row)
 
     import csv
+
     with open(trace_dir / "scores.csv", "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=["query_id"] + score_cols)
         w.writeheader()
@@ -455,12 +497,14 @@ def _write_summary(results: list, queries: list, trace_dir: Path, round_name: st
     totals = [r["total"] for r in rows]
     mean_score = sum(totals) / len(totals) if totals else 0
     pass_rate = sum(1 for t in totals if t >= 80) / len(totals) * 100 if totals else 0
-    correctness_rate = sum(1 for t in rows if t["correct"] >= 45) / len(rows) * 100 if rows else 0
+    correctness_rate = (
+        sum(1 for t in rows if t["correct"] >= 45) / len(rows) * 100 if rows else 0
+    )
 
     lines = [
         f"# Round {round_name} Summary\n",
-        f"| Metric | Value |",
-        f"|--------|-------|",
+        "| Metric | Value |",
+        "|--------|-------|",
         f"| Mean Score | {mean_score:.1f}/100 |",
         f"| Pass Rate (≥80) | {pass_rate:.0f}% |",
         f"| Correctness Rate | {correctness_rate:.0f}% |",

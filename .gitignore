@@ -17,3 +17,7 @@ data/processed/
 
 # OS files
 .DS_Store
+.env.*
+!.env.example
+.pytest_cache/
+*.log

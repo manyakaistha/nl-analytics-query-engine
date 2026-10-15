@@ -1,91 +1,219 @@
-"""
-FastAPI application — routes and static file serving.
-"""
+"""Same-origin public demo API with bounded admission and session privacy."""
 
-from __future__ import annotations
-
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+import asyncio
+import secrets
+import time
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-
-from app.config import AVAILABLE_MODELS, GROQ_MODEL, STATIC_DIR
+from starlette.concurrency import run_in_threadpool
+from app.config import (
+    AVAILABLE_MODELS,
+    GROQ_MODEL,
+    STATIC_DIR,
+    DEMO_MODE,
+    MAX_REQUEST_BYTES,
+    MAX_CONCURRENT_REQUESTS,
+)
+from app.database import get_connection, close_database, get_profile
 from app.engine import process_query
-from app.feedback import get_recent_entries, update_user_feedback
-from app.models import FeedbackRequest, HistoryEntry, QueryRequest, QueryResponse
+from app.feedback import issue_receipt, record_feedback
+from app.llm import close_client
+from app.limits import RateLimiter, UsageError
+from app.models import QueryRequest, QueryResponse, FeedbackRequest
 
 
-def create_app() -> FastAPI:
-    """Create and configure the FastAPI application."""
+class RequestBoundary:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        # Buffer at most MAX_REQUEST_BYTES before validation, including chunked requests.
+        size, messages = 0, []
+        deadline = time.monotonic() + 10
+        while True:
+            try:
+                message = await asyncio.wait_for(
+                    receive(), timeout=max(0.001, deadline - time.monotonic())
+                )
+            except asyncio.TimeoutError:
+                return await JSONResponse(
+                    {"detail": "Request body timed out."}, status_code=408
+                )(scope, receive, send)
+            if message["type"] == "http.disconnect":
+                return
+            size += len(message.get("body", b""))
+            if size > MAX_REQUEST_BYTES:
+                return await JSONResponse(
+                    {"detail": "Request is too large."}, status_code=413
+                )(scope, receive, send)
+            messages.append(message)
+            if not message.get("more_body", False):
+                break
+
+        async def replay():
+            if messages:
+                return messages.pop(0)
+            return await receive()
+
+        async def secure_send(message):
+            if message["type"] == "http.response.start":
+                message["headers"] += [
+                    (b"x-content-type-options", b"nosniff"),
+                    (b"referrer-policy", b"same-origin"),
+                    (b"cache-control", b"no-store"),
+                    (
+                        b"content-security-policy",
+                        b"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+                    ),
+                ]
+            await send(message)
+
+        await self.app(scope, replay, secure_send)
+
+
+def create_app():
+    @asynccontextmanager
+    async def lifespan(app):
+        get_connection()
+        try:
+            yield
+        finally:
+            close_client()
+            close_database()
+
     app = FastAPI(
-        title="Intelligent Analytics Query Engine",
-        description="Natural language → SQL → DuckDB analytics",
-        version="0.1.0",
+        title="Sales Lens · AI Analytics",
+        lifespan=lifespan,
+        docs_url=None if DEMO_MODE else "/docs",
+        redoc_url=None,
+        openapi_url=None if DEMO_MODE else "/openapi.json",
     )
+    app.add_middleware(RequestBoundary)
+    limiter = RateLimiter()
+    active = 0
 
-    # CORS — allow the frontend (same origin in production, any in dev)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-    _register_routes(app)
-    return app
-
-
-def _register_routes(app: FastAPI) -> None:
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(request, exc):
+        return JSONResponse(
+            {
+                "detail": "Invalid request. Enter a question (1–1000 characters) and check the supplied fields."
+            },
+            status_code=422,
+        )
 
     @app.get("/")
-    async def serve_index():
-        """Serve the chat UI."""
-        index_path = STATIC_DIR / "index.html"
-        if not index_path.exists():
-            raise HTTPException(status_code=404, detail="index.html not found")
-        return FileResponse(index_path, media_type="text/html")
+    def index():
+        return FileResponse(STATIC_DIR / "index.html")
 
-    # Mount static files for any additional assets (CSS, JS, images)
-    if STATIC_DIR.exists():
-        app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-    @app.post("/api/query", response_model=QueryResponse)
-    async def handle_query(request: QueryRequest):
-        """
-        Main endpoint: accept a natural language query, translate to SQL,
-        execute against DuckDB, and return structured results.
-        """
-        try:
-            response = process_query(request.query, model=request.model, api_key=request.api_key)
-            return response
-        except Exception as exc:
-            detail = str(exc)
-            if request.api_key and request.api_key.strip():
-                detail = detail.replace(request.api_key.strip(), "[redacted]")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Query processing failed: {detail}",
-            )
-
-    @app.post("/api/feedback")
-    async def handle_feedback(request: FeedbackRequest):
-        """Record user feedback (thumbs up/down) on a query response."""
-        updated = update_user_feedback(
-            query=request.query,
-            generated_sql=request.generated_sql,
-            feedback=request.feedback,
-        )
-        if not updated:
-            return {"status": "not_found", "message": "No matching entry found in log."}
-        return {"status": "ok", "message": f"Feedback '{request.feedback}' recorded."}
+    @app.get("/healthz")
+    def health():
+        return {"status": "ok", "dataset_rows": get_profile()["rows"]}
 
     @app.get("/api/models")
-    async def get_models():
-        """Return the list of selectable models and the server default."""
-        return {"models": AVAILABLE_MODELS, "default": GROQ_MODEL}
+    def models():
+        return {
+            "models": AVAILABLE_MODELS,
+            "default": GROQ_MODEL,
+            "synthetic": True,
+            "period": "January–March 2024",
+        }
 
     @app.get("/api/history")
-    async def get_history():
-        """Return recent query history from the feedback log."""
-        entries = get_recent_entries(limit=50)
-        return {"entries": entries}
+    def history():
+        raise HTTPException(
+            410,
+            "History is stored only in your browser tab. No public server history is available.",
+        )
+
+    @app.post("/api/query", response_model=QueryResponse)
+    async def query(body: QueryRequest, request: Request):
+        nonlocal active
+        if body.model is not None and body.model not in AVAILABLE_MODELS:
+            raise HTTPException(422, "Choose one of the available models.")
+        if DEMO_MODE and body.api_key:
+            raise HTTPException(
+                422, "This demo uses a server-managed key. Do not submit credentials."
+            )
+        try:
+            limiter.check(request.client.host if request.client else "unknown")
+        except UsageError as exc:
+            raise HTTPException(
+                exc.status_code, str(exc), headers={"Retry-After": "60"}
+            ) from None
+        if active >= MAX_CONCURRENT_REQUESTS:
+            raise HTTPException(
+                429,
+                "The demo is busy. Please try again shortly.",
+                headers={"Retry-After": "10"},
+            )
+        active += 1
+        session = request.cookies.get("analytics_session", "")
+        if len(session) != 48 or not all(c in "0123456789abcdef" for c in session):
+            session = secrets.token_hex(24)
+        try:
+            response = await run_in_threadpool(
+                process_query,
+                body.query,
+                model=body.model,
+                api_key=body.api_key,
+                cache_scope=session,
+            )
+            if response.error_code:
+                status = (
+                    429
+                    if response.error_code in {"budget", "provider_rate_limit"}
+                    else 503
+                    if response.error_code
+                    in {"unavailable", "provider_failure", "provider_access"}
+                    else 422
+                )
+                return JSONResponse(
+                    {
+                        "detail": str(response.result).removeprefix("Error: "),
+                        "error_code": response.error_code,
+                    },
+                    status_code=status,
+                    headers={"Retry-After": "60"} if status == 429 else None,
+                )
+            response.feedback_id = issue_receipt(session)
+            start = time.perf_counter()
+            payload = response.model_dump(mode="json")
+            payload["timings_ms"]["serialization"] = round(
+                (time.perf_counter() - start) * 1000, 3
+            )
+            result = JSONResponse(payload)
+            result.set_cookie(
+                "analytics_session",
+                session,
+                httponly=True,
+                secure=request.url.scheme == "https",
+                samesite="strict",
+            )
+            return result
+        except Exception:
+            raise HTTPException(
+                500, "The query could not be completed. Please try again."
+            ) from None
+        finally:
+            active -= 1
+
+    @app.post("/api/feedback")
+    async def feedback(body: FeedbackRequest, request: Request):
+        if not record_feedback(
+            body.feedback_id,
+            request.cookies.get("analytics_session", ""),
+            body.feedback,
+        ):
+            raise HTTPException(
+                404, "This feedback link has expired or belongs to another session."
+            )
+        return {"status": "ok", "message": "Feedback recorded. Thank you."}
+
+    return app

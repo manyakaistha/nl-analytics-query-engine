@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: sales-lens
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.13
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: DEMO_MODE
+        value: "true"
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: CLIENT_REQUESTS_PER_MINUTE
+        value: "5"
+      - key: GLOBAL_REQUESTS_PER_MINUTE
+        value: "30"
+      - key: MAX_CONCURRENT_REQUESTS
+        value: "2"
+      - key: LLM_DAILY_REQUEST_BUDGET
+        value: "200"
+      - key: DUCKDB_MEMORY_MB
+        value: "192"

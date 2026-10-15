@@ -18,7 +18,6 @@ Usage:
 import csv
 import io
 import json
-import sys
 from pathlib import Path
 
 
@@ -35,10 +34,8 @@ REQUIRED_FILES = (
 
 
 def ensure_processed_data() -> None:
-    """Create generated inputs on a fresh clone, without replacing existing files."""
-    missing = [name for name in REQUIRED_FILES if not (PROCESSED_DIR / name).is_file()]
-    if not missing:
-        return
+    """Regenerate derived inputs whenever source OR output fingerprints differ."""
+    import hashlib
 
     sources = {
         "data_dictionary.json": "data_dictionary.json",
@@ -46,22 +43,33 @@ def ensure_processed_data() -> None:
         "sales_data.csv": "sales_data.csv",
         "targets.csv": "targets.csv",
     }
-    for name in missing:
-        source = RAW_DATA_DIR / sources[name]
-        if not source.is_file():
-            raise FileNotFoundError(
-                f"Missing project data/{sources[name]}; restore the source file "
-                "or run `uv run python scripts/preprocess.py` after adding it."
-            )
-
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
-    for name in missing:
-        source = RAW_DATA_DIR / sources[name]
-        destination = PROCESSED_DIR / name
-        if name.endswith(".json"):
-            process_json_file(source, destination)
-        else:
-            process_csv_file(source, destination)
+    manifest_path = PROCESSED_DIR / "manifest.json"
+    try:
+        previous = json.loads(manifest_path.read_text())
+    except (OSError, ValueError):
+        previous = {}
+    manifest = {}
+    for name, source_name in sources.items():
+        source, destination = RAW_DATA_DIR / source_name, PROCESSED_DIR / name
+        source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+        output_hash = (
+            hashlib.sha256(destination.read_bytes()).hexdigest()
+            if destination.exists()
+            else None
+        )
+        if previous.get(name) != [source_hash, output_hash] or output_hash is None:
+            temporary = destination.with_suffix(destination.suffix + ".tmp")
+            if name.endswith(".json"):
+                process_json_file(source, temporary)
+            else:
+                process_csv_file(source, temporary)
+            temporary.replace(destination)
+        manifest[name] = [
+            source_hash,
+            hashlib.sha256(destination.read_bytes()).hexdigest(),
+        ]
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True) + "\n")
 
 
 def _normalize_text(raw: str) -> str:
@@ -106,7 +114,7 @@ def clean_malformed_json(raw_text: str) -> dict | list:
         # Detect the pattern:  "    ""key"": ""value"","
         # The line starts AND ends with a double-quote
         if stripped.startswith('"') and stripped.endswith('"') and len(stripped) > 2:
-            inner = stripped[1:-1]            # peel outer quotes
+            inner = stripped[1:-1]  # peel outer quotes
             inner = inner.replace('""', '"')  # un-double internal quotes
             cleaned_lines.append(inner)
         else:
@@ -151,7 +159,8 @@ def clean_malformed_csv(raw_text: str) -> str:
 
     # Detect: if most lines are a single quoted field, unwrap them
     quoted_count = sum(
-        1 for line in lines
+        1
+        for line in lines
         if line.strip().startswith('"') and line.strip().endswith('"')
     )
 
@@ -190,62 +199,7 @@ def process_csv_file(src: Path, dst: Path) -> None:
 
 
 def main() -> None:
-    print("=" * 60)
-    print("  Data Preprocessing Pipeline")
-    print("=" * 60)
-    print(f"  Source : {RAW_DATA_DIR}")
-    print(f"  Output : {PROCESSED_DIR}")
-    print()
-
-    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
-
-    errors = 0
-
-    for fname in ["data_dictionary.json", "nl_queries.json"]:
-        # The raw examples contain pseudo-SQL and an incorrect AOV formula.
-        # Keep them as source material, but publish the reviewed runnable set.
-        source_name = "nl_queries_curated.json" if fname == "nl_queries.json" else fname
-        src = RAW_DATA_DIR / source_name
-        dst = PROCESSED_DIR / fname
-        if src.exists():
-            try:
-                process_json_file(src, dst)
-            except Exception as exc:
-                print(f"    ✗ FAILED: {exc}")
-                errors += 1
-        else:
-            print(f"  [SKIP] {fname} not found")
-
-    print()
-
-    for fname in ["sales_data.csv", "targets.csv"]:
-        src = RAW_DATA_DIR / fname
-        dst = PROCESSED_DIR / fname
-        if src.exists():
-            try:
-                process_csv_file(src, dst)
-            except Exception as exc:
-                print(f"    ✗ FAILED: {exc}")
-                errors += 1
-        else:
-            print(f"  [SKIP] {fname} not found")
-
-    feedback_log = PROCESSED_DIR / "feedback_log.csv"
-    if not feedback_log.exists():
-        feedback_log.write_text(
-            "timestamp,query,generated_sql,status,error_message,user_feedback,confidence_score\n",
-            encoding="utf-8",
-        )
-        print(f"\n  ✓ Created empty feedback log → {feedback_log.name}")
-
-    print()
-    print("=" * 60)
-    if errors:
-        print(f"  ✗ Completed with {errors} error(s)")
-        sys.exit(1)
-    else:
-        print("  ✓ Preprocessing complete — all files cleaned!")
-    print("=" * 60)
+    ensure_processed_data()
 
 
 if __name__ == "__main__":

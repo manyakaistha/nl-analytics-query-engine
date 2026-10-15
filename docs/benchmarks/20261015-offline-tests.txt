@@ -1,0 +1,99 @@
+/Volumes/1700 APFS/PERSONAL_PROGRAMMING_PROJECTS/sql_interview_tool/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+test_actual_daily_budget_returns_429_without_calling_provider (test_public_demo.APITests) ... INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 429 Too Many Requests"
+ok
+test_client_and_global_limits_and_forwarded_header (test_public_demo.APITests) ... INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 200 OK"
+INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 200 OK"
+INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 200 OK"
+INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 200 OK"
+INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 200 OK"
+INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 429 Too Many Requests"
+ok
+test_concurrency_overload (test_public_demo.APITests) ... INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 429 Too Many Requests"
+INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 200 OK"
+ok
+test_empty_result_and_invalid_sql (test_public_demo.APITests) ... INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 200 OK"
+INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 422 Unprocessable Entity"
+ok
+test_feedback_expiry (test_public_demo.APITests) ... ok
+test_feedback_is_session_isolated (test_public_demo.APITests) ... INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 200 OK"
+INFO: HTTP Request: POST http://testserver/api/feedback "HTTP/1.1 404 Not Found"
+INFO: HTTP Request: POST http://testserver/api/feedback "HTTP/1.1 200 OK"
+ok
+test_invalid_oversized_and_no_secret_echo (test_public_demo.APITests) ... INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 422 Unprocessable Entity"
+INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 422 Unprocessable Entity"
+INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 422 Unprocessable Entity"
+INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 422 Unprocessable Entity"
+INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 422 Unprocessable Entity"
+INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 413 Request Entity Too Large"
+INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 422 Unprocessable Entity"
+ok
+test_page_models_health_history (test_public_demo.APITests) ... INFO: HTTP Request: GET http://testserver/ "HTTP/1.1 200 OK"
+INFO: HTTP Request: GET http://testserver/api/models "HTTP/1.1 200 OK"
+INFO: HTTP Request: GET http://testserver/healthz "HTTP/1.1 200 OK"
+INFO: HTTP Request: GET http://testserver/api/history "HTTP/1.1 410 Gone"
+ok
+test_provider_failures_have_correct_status (test_public_demo.APITests) ... INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 503 Service Unavailable"
+INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 429 Too Many Requests"
+ok
+test_curated_sql_examples_execute (test_public_demo.ConfigurationTests) ... ok
+test_placeholder_keys_and_primary_priority (test_public_demo.ConfigurationTests) ... ok
+test_full_dataset_and_exact_revenue (test_public_demo.DataTests) ... ok
+test_monthly_targets_and_repeated_customers (test_public_demo.DataTests) ... ok
+test_stale_processed_data_is_refreshed_and_idempotent (test_public_demo.DataTests) ... ok
+test_budget_counts_each_actual_provider_call (test_public_demo.ProviderTests) ... INFO: Groq completion model=openai/gpt-oss-120b tokens=<MagicMock name='mock.chat.completions.create().usage.total_tokens' id='4426393648'> elapsed_ms=0.4
+ok
+test_daily_budget_and_reset (test_public_demo.ProviderTests) ... ok
+test_duplicate_requests_share_generation (test_public_demo.ProviderTests) ... ok
+test_explanation_is_grounded_not_model_numbers (test_public_demo.ProviderTests) ... ok
+test_json_fences_empty_and_sql_fences (test_public_demo.ProviderTests) ... ok
+test_missing_key (test_public_demo.ProviderTests) ... ok
+test_retryable_provider_error_is_bounded (test_public_demo.ProviderTests) ... ok
+test_session_cache_and_dataset_version (test_public_demo.ProviderTests) ... ok
+test_timeout_and_secret_failure_are_sanitized (test_public_demo.ProviderTests) ... ok
+test_unsafe_sql_does_not_retry (test_public_demo.ProviderTests) ... ok
+test_attack_catalog (test_public_demo.SecurityTests) ... WARNING: 'LOAD httpfs' contains unsupported syntax. Falling back to parsing as a 'Command'.
+ok
+test_database_blocks_external_access_even_without_guard (test_public_demo.SecurityTests) ... ok
+test_legitimate_analytics_and_column_binding (test_public_demo.SecurityTests) ... ok
+test_real_interrupt_does_not_poison_next_query (test_public_demo.SecurityTests) ... ok
+test_results_are_bounded (test_public_demo.SecurityTests) ... ok
+test_empty_result_is_empty (test_regressions.EvalComparisonTests) ... ok
+test_extra_justifying_column_gets_partial_credit (test_regressions.EvalComparisonTests) ... ok
+test_numeric_scalar_string_gets_full_credit (test_regressions.EvalComparisonTests) ... ok
+test_values_attached_to_wrong_rows_are_not_nearly_correct (test_regressions.EvalComparisonTests) ... ok
+test_raw_feedback_cannot_become_system_instructions (test_regressions.FeedbackTests) ... ok
+test_read_only_query_still_works (test_regressions.QueryGuardTests) ... ok
+test_select_cannot_read_local_files (test_regressions.QueryGuardTests) ... ok
+test_write_and_multiple_statements_are_rejected (test_regressions.QueryGuardTests) ... ok
+test_failed_request_is_not_cached (test_regressions.ResponseCacheTests) ... ok
+test_lru_evicts_oldest_entry (test_regressions.ResponseCacheTests) ... ok
+test_repeat_skips_generation_but_prompt_change_invalidates (test_regressions.ResponseCacheTests) ... ok
+test_rate_limit_does_not_trigger_more_model_calls (test_regressions.RetryTests) ... ok
+test_rejected_user_key_stops_without_retry (test_regressions.RetryTests) ... ok
+test_cache_is_separate_for_each_key (test_regressions.UserKeyTests) ... ok
+test_demo_rejects_browser_key_without_echoing_it (test_regressions.UserKeyTests) ... INFO: HTTP Request: POST http://testserver/api/query "HTTP/1.1 422 Unprocessable Entity"
+ok
+test_supplied_key_uses_request_client (test_regressions.UserKeyTests) ... INFO: Groq completion model=openai/gpt-oss-120b tokens=<MagicMock name='Groq().chat.completions.create().usage.total_tokens' id='4427392640'> elapsed_ms=0.8
+ok
+
+----------------------------------------------------------------------
+Ran 45 tests in 1.565s
+
+OK
+  Processing JSON: data_dictionary.json
+    ✓ Wrote cleaned JSON → data_dictionary.json.tmp
+  Processing JSON: nl_queries_curated.json
+    ✓ Wrote cleaned JSON → nl_queries.json.tmp
+  Processing CSV:  sales_data.csv
+    Columns: 1, Rows: 1 (excl. header)
+    ✓ Wrote cleaned CSV  → sales_data.csv.tmp
+  Processing CSV:  targets.csv
+    Columns: 1, Rows: 1 (excl. header)
+    ✓ Wrote cleaned CSV  → targets.csv.tmp
+  Processing CSV:  sales_data.csv
+    Columns: 1, Rows: 1 (excl. header)
+    ✓ Wrote cleaned CSV  → sales_data.csv.tmp
+  Processing CSV:  sales_data.csv
+    Columns: 1, Rows: 1 (excl. header)
+    ✓ Wrote cleaned CSV  → sales_data.csv.tmp

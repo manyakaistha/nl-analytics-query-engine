@@ -1,0 +1,901 @@
+{
+  "mode": "OFFLINE / MOCKED GROQ; no live generation accuracy or latency measured",
+  "timestamp_utc": "2026-10-15T08:49:31.023514+00:00",
+  "platform": "macOS-27.0.1-arm64-arm-64bit",
+  "python": "3.10.18",
+  "runs_per_case": 5,
+  "database_startup_ms": 366.913,
+  "process_peak_rss_mib": 123.64,
+  "prompt_characters": 6027,
+  "dataset": {
+    "rows": 50000,
+    "columns": [
+      "order_id",
+      "order_date",
+      "region",
+      "country",
+      "city",
+      "customer_id",
+      "customer_segment",
+      "product_category",
+      "product_subcategory",
+      "product_name",
+      "quantity",
+      "unit_price",
+      "discount",
+      "shipping_cost",
+      "profit"
+    ],
+    "distinct_orders": 33347,
+    "distinct_customers": 8424,
+    "date_range": [
+      "2024-01-01",
+      "2024-03-31"
+    ],
+    "target_rows": 9,
+    "categorical_dimensions": {
+      "region": [
+        "APAC",
+        "EMEA",
+        "NA"
+      ],
+      "country": [
+        "France",
+        "Germany",
+        "India",
+        "UK",
+        "USA"
+      ],
+      "city": [
+        "Bangalore",
+        "Berlin",
+        "Chicago",
+        "Delhi",
+        "London",
+        "Mumbai",
+        "New York",
+        "Paris",
+        "San Francisco"
+      ],
+      "customer_segment": [
+        "Consumer",
+        "Corporate",
+        "Home Office"
+      ],
+      "product_category": [
+        "Furniture",
+        "Office Supplies",
+        "Technology"
+      ],
+      "product_subcategory": [
+        "Accessories",
+        "Binders",
+        "Chairs",
+        "Laptops",
+        "Paper",
+        "Phones",
+        "Tables"
+      ],
+      "product_name": [
+        "A4 Paper Pack",
+        "Binder Set",
+        "Conference Table",
+        "Dell XPS",
+        "Ergo Chair",
+        "File Organizer",
+        "Gaming Chair",
+        "MacBook Air",
+        "Mechanical Keyboard",
+        "Mesh Office Chair",
+        "Mouse",
+        "Notebook Set",
+        "Office Desk",
+        "Samsung Galaxy",
+        "Standing Desk",
+        "Sticky Notes Pack",
+        "USB-C Hub",
+        "Webcam",
+        "iPhone 14"
+      ]
+    },
+    "total_revenue": "23341186.3890",
+    "total_profit": "3090849.13",
+    "dataset_version": "9da31fb58bd81e97e9d8251d505c01e0c085a78555aee2ec1140007954202e37",
+    "monthly_revenue": {
+      "APAC/2024-01": "2370826.5629",
+      "APAC/2024-02": "2912775.4190",
+      "APAC/2024-03": "3669464.7616",
+      "EMEA/2024-01": "2097876.8205",
+      "EMEA/2024-02": "2578535.2700",
+      "EMEA/2024-03": "3255544.2731",
+      "NA/2024-01": "1735596.5649",
+      "NA/2024-02": "2029559.2781",
+      "NA/2024-03": "2691007.4389"
+    }
+  },
+  "cases": [
+    {
+      "case": "total_revenue",
+      "question": "What is the total revenue?",
+      "oracle_sql": "SELECT SUM(revenue) AS total_revenue FROM sales_with_revenue",
+      "oracle_result": [
+        {
+          "total_revenue": "23341186.389000"
+        }
+      ],
+      "sql": {
+        "median_ms": 0.627,
+        "p90_ms": 0.676
+      },
+      "mocked_api_cache_miss": {
+        "median_ms": 1.267,
+        "p90_ms": 3.552
+      },
+      "mocked_api_cache_hit": {
+        "median_ms": 0.568,
+        "p90_ms": 0.628
+      },
+      "mocked_groq": {
+        "median_ms": 0.009,
+        "p90_ms": 0.011
+      }
+    },
+    {
+      "case": "regional_revenue",
+      "question": "Which region generated the most revenue?",
+      "oracle_sql": "SELECT region,SUM(revenue) AS revenue FROM sales_with_revenue GROUP BY region ORDER BY revenue DESC",
+      "oracle_result": [
+        {
+          "region": "APAC",
+          "revenue": "8953066.743500"
+        },
+        {
+          "region": "EMEA",
+          "revenue": "7931956.363600"
+        },
+        {
+          "region": "NA",
+          "revenue": "6456163.281900"
+        }
+      ],
+      "sql": {
+        "median_ms": 1.129,
+        "p90_ms": 1.168
+      },
+      "mocked_api_cache_miss": {
+        "median_ms": 1.717,
+        "p90_ms": 2.05
+      },
+      "mocked_api_cache_hit": {
+        "median_ms": 0.502,
+        "p90_ms": 0.537
+      },
+      "mocked_groq": {
+        "median_ms": 0.007,
+        "p90_ms": 0.009
+      }
+    },
+    {
+      "case": "category_profit",
+      "question": "Which product category is most profitable?",
+      "oracle_sql": "SELECT product_category,SUM(profit) AS profit FROM sales_data GROUP BY product_category ORDER BY profit DESC",
+      "oracle_result": [
+        {
+          "product_category": "Technology",
+          "profit": "1734798.01"
+        },
+        {
+          "product_category": "Furniture",
+          "profit": "1137664.40"
+        },
+        {
+          "product_category": "Office Supplies",
+          "profit": "218386.72"
+        }
+      ],
+      "sql": {
+        "median_ms": 1.157,
+        "p90_ms": 1.308
+      },
+      "mocked_api_cache_miss": {
+        "median_ms": 1.746,
+        "p90_ms": 1.889
+      },
+      "mocked_api_cache_hit": {
+        "median_ms": 0.55,
+        "p90_ms": 0.611
+      },
+      "mocked_groq": {
+        "median_ms": 0.008,
+        "p90_ms": 0.009
+      }
+    },
+    {
+      "case": "category_revenue",
+      "question": "Revenue by category",
+      "oracle_sql": "SELECT product_category,SUM(revenue) AS revenue FROM sales_with_revenue GROUP BY product_category ORDER BY revenue DESC",
+      "oracle_result": [
+        {
+          "product_category": "Technology",
+          "revenue": "16679610.271900"
+        },
+        {
+          "product_category": "Furniture",
+          "revenue": "6002968.359400"
+        },
+        {
+          "product_category": "Office Supplies",
+          "revenue": "658607.757700"
+        }
+      ],
+      "sql": {
+        "median_ms": 1.38,
+        "p90_ms": 1.677
+      },
+      "mocked_api_cache_miss": {
+        "median_ms": 1.985,
+        "p90_ms": 2.446
+      },
+      "mocked_api_cache_hit": {
+        "median_ms": 0.543,
+        "p90_ms": 0.704
+      },
+      "mocked_groq": {
+        "median_ms": 0.009,
+        "p90_ms": 0.011
+      }
+    },
+    {
+      "case": "monthly_revenue",
+      "question": "Show monthly revenue by region.",
+      "oracle_sql": "SELECT order_month,region,SUM(revenue) AS revenue FROM sales_with_revenue GROUP BY order_month,region ORDER BY order_month,region",
+      "oracle_result": [
+        {
+          "order_month": "2024-01",
+          "region": "APAC",
+          "revenue": "2370826.562900"
+        },
+        {
+          "order_month": "2024-01",
+          "region": "EMEA",
+          "revenue": "2097876.820500"
+        },
+        {
+          "order_month": "2024-01",
+          "region": "NA",
+          "revenue": "1735596.564900"
+        },
+        {
+          "order_month": "2024-02",
+          "region": "APAC",
+          "revenue": "2912775.419000"
+        },
+        {
+          "order_month": "2024-02",
+          "region": "EMEA",
+          "revenue": "2578535.270000"
+        },
+        {
+          "order_month": "2024-02",
+          "region": "NA",
+          "revenue": "2029559.278100"
+        },
+        {
+          "order_month": "2024-03",
+          "region": "APAC",
+          "revenue": "3669464.761600"
+        },
+        {
+          "order_month": "2024-03",
+          "region": "EMEA",
+          "revenue": "3255544.273100"
+        },
+        {
+          "order_month": "2024-03",
+          "region": "NA",
+          "revenue": "2691007.438900"
+        }
+      ],
+      "sql": {
+        "median_ms": 2.744,
+        "p90_ms": 2.906
+      },
+      "mocked_api_cache_miss": {
+        "median_ms": 3.31,
+        "p90_ms": 3.382
+      },
+      "mocked_api_cache_hit": {
+        "median_ms": 0.539,
+        "p90_ms": 0.568
+      },
+      "mocked_groq": {
+        "median_ms": 0.007,
+        "p90_ms": 0.009
+      }
+    },
+    {
+      "case": "aov",
+      "question": "What is the average order value?",
+      "oracle_sql": "SELECT SUM(revenue)/COUNT(DISTINCT order_id) AS average_order_value FROM sales_with_revenue",
+      "oracle_result": [
+        {
+          "average_order_value": 699.9486127387771
+        }
+      ],
+      "sql": {
+        "median_ms": 1.242,
+        "p90_ms": 1.333
+      },
+      "mocked_api_cache_miss": {
+        "median_ms": 2.039,
+        "p90_ms": 2.235
+      },
+      "mocked_api_cache_hit": {
+        "median_ms": 0.627,
+        "p90_ms": 0.724
+      },
+      "mocked_groq": {
+        "median_ms": 0.01,
+        "p90_ms": 0.01
+      }
+    },
+    {
+      "case": "top_customers",
+      "question": "Top 10 customers by revenue",
+      "oracle_sql": "SELECT customer_id,SUM(revenue) AS revenue FROM sales_with_revenue GROUP BY customer_id ORDER BY revenue DESC,customer_id LIMIT 10",
+      "oracle_result": [
+        {
+          "customer_id": "C004203",
+          "revenue": "46232.092300"
+        },
+        {
+          "customer_id": "C007838",
+          "revenue": "38946.172700"
+        },
+        {
+          "customer_id": "C005190",
+          "revenue": "38291.771400"
+        },
+        {
+          "customer_id": "C006652",
+          "revenue": "37542.673400"
+        },
+        {
+          "customer_id": "C002074",
+          "revenue": "36125.692000"
+        },
+        {
+          "customer_id": "C005074",
+          "revenue": "32808.283800"
+        },
+        {
+          "customer_id": "C003399",
+          "revenue": "31794.276700"
+        },
+        {
+          "customer_id": "C002210",
+          "revenue": "30425.132500"
+        },
+        {
+          "customer_id": "C003340",
+          "revenue": "30223.487600"
+        },
+        {
+          "customer_id": "C001788",
+          "revenue": "30002.139000"
+        }
+      ],
+      "sql": {
+        "median_ms": 1.606,
+        "p90_ms": 1.86
+      },
+      "mocked_api_cache_miss": {
+        "median_ms": 2.354,
+        "p90_ms": 3.012
+      },
+      "mocked_api_cache_hit": {
+        "median_ms": 0.68,
+        "p90_ms": 0.686
+      },
+      "mocked_groq": {
+        "median_ms": 0.011,
+        "p90_ms": 0.015
+      }
+    },
+    {
+      "case": "targets",
+      "question": "How does revenue compare with monthly targets?",
+      "oracle_sql": "WITH m AS (SELECT region,order_month,SUM(revenue) AS revenue FROM sales_with_revenue GROUP BY region,order_month) SELECT t.region,t.month,COALESCE(m.revenue,0) AS actual_revenue,t.target_revenue,100*COALESCE(m.revenue,0)/t.target_revenue AS attainment_pct FROM targets t LEFT JOIN m ON t.region=m.region AND t.month=m.order_month ORDER BY t.region,t.month",
+      "oracle_result": [
+        {
+          "region": "APAC",
+          "month": "2024-01",
+          "actual_revenue": "2370826.562900",
+          "target_revenue": "2549000.00",
+          "attainment_pct": 93.01006523734797
+        },
+        {
+          "region": "APAC",
+          "month": "2024-02",
+          "actual_revenue": "2912775.419000",
+          "target_revenue": "2738000.00",
+          "attainment_pct": 106.3833242878013
+        },
+        {
+          "region": "APAC",
+          "month": "2024-03",
+          "actual_revenue": "3669464.761600",
+          "target_revenue": "3780000.00",
+          "attainment_pct": 97.07578734391535
+        },
+        {
+          "region": "EMEA",
+          "month": "2024-01",
+          "actual_revenue": "2097876.820500",
+          "target_revenue": "2003000.00",
+          "attainment_pct": 104.73673592111832
+        },
+        {
+          "region": "EMEA",
+          "month": "2024-02",
+          "actual_revenue": "2578535.270000",
+          "target_revenue": "2798000.00",
+          "attainment_pct": 92.15637133666905
+        },
+        {
+          "region": "EMEA",
+          "month": "2024-03",
+          "actual_revenue": "3255544.273100",
+          "target_revenue": "3174000.00",
+          "attainment_pct": 102.56913273787019
+        },
+        {
+          "region": "NA",
+          "month": "2024-01",
+          "actual_revenue": "1735596.564900",
+          "target_revenue": "1805000.00",
+          "attainment_pct": 96.15493434349031
+        },
+        {
+          "region": "NA",
+          "month": "2024-02",
+          "actual_revenue": "2029559.278100",
+          "target_revenue": "1867000.00",
+          "attainment_pct": 108.70697793786825
+        },
+        {
+          "region": "NA",
+          "month": "2024-03",
+          "actual_revenue": "2691007.438900",
+          "target_revenue": "3000000.00",
+          "attainment_pct": 89.70024796333333
+        }
+      ],
+      "sql": {
+        "median_ms": 3.423,
+        "p90_ms": 3.529
+      },
+      "mocked_api_cache_miss": {
+        "median_ms": 4.203,
+        "p90_ms": 4.334
+      },
+      "mocked_api_cache_hit": {
+        "median_ms": 0.583,
+        "p90_ms": 0.65
+      },
+      "mocked_groq": {
+        "median_ms": 0.008,
+        "p90_ms": 0.01
+      }
+    },
+    {
+      "case": "products",
+      "question": "What are the top 10 products by revenue?",
+      "oracle_sql": "SELECT product_name,SUM(revenue) AS revenue FROM sales_with_revenue GROUP BY product_name ORDER BY revenue DESC LIMIT 10",
+      "oracle_result": [
+        {
+          "product_name": "Dell XPS",
+          "revenue": "4503480.119500"
+        },
+        {
+          "product_name": "MacBook Air",
+          "revenue": "3899535.762800"
+        },
+        {
+          "product_name": "iPhone 14",
+          "revenue": "3502932.591100"
+        },
+        {
+          "product_name": "Samsung Galaxy",
+          "revenue": "3297707.614900"
+        },
+        {
+          "product_name": "Office Desk",
+          "revenue": "1461892.973700"
+        },
+        {
+          "product_name": "Standing Desk",
+          "revenue": "1196670.825400"
+        },
+        {
+          "product_name": "Ergo Chair",
+          "revenue": "900279.985700"
+        },
+        {
+          "product_name": "Mesh Office Chair",
+          "revenue": "863635.451300"
+        },
+        {
+          "product_name": "Conference Table",
+          "revenue": "826076.078500"
+        },
+        {
+          "product_name": "Gaming Chair",
+          "revenue": "754413.044800"
+        }
+      ],
+      "sql": {
+        "median_ms": 1.693,
+        "p90_ms": 1.943
+      },
+      "mocked_api_cache_miss": {
+        "median_ms": 2.419,
+        "p90_ms": 2.488
+      },
+      "mocked_api_cache_hit": {
+        "median_ms": 0.564,
+        "p90_ms": 0.738
+      },
+      "mocked_groq": {
+        "median_ms": 0.009,
+        "p90_ms": 0.01
+      }
+    },
+    {
+      "case": "segments",
+      "question": "Which customer segment generates the most sales?",
+      "oracle_sql": "SELECT customer_segment,SUM(revenue) AS revenue FROM sales_with_revenue GROUP BY customer_segment ORDER BY revenue DESC",
+      "oracle_result": [
+        {
+          "customer_segment": "Corporate",
+          "revenue": "10515376.607400"
+        },
+        {
+          "customer_segment": "Consumer",
+          "revenue": "9415788.706800"
+        },
+        {
+          "customer_segment": "Home Office",
+          "revenue": "3410021.074800"
+        }
+      ],
+      "sql": {
+        "median_ms": 1.28,
+        "p90_ms": 1.304
+      },
+      "mocked_api_cache_miss": {
+        "median_ms": 1.891,
+        "p90_ms": 1.907
+      },
+      "mocked_api_cache_hit": {
+        "median_ms": 0.509,
+        "p90_ms": 0.572
+      },
+      "mocked_groq": {
+        "median_ms": 0.008,
+        "p90_ms": 0.008
+      }
+    },
+    {
+      "case": "repeat_customers",
+      "question": "Which top 50 customers placed multiple orders?",
+      "oracle_sql": "SELECT customer_id,COUNT(DISTINCT order_id) AS orders,SUM(revenue) AS revenue FROM sales_with_revenue GROUP BY customer_id HAVING COUNT(DISTINCT order_id)>1 ORDER BY revenue DESC,customer_id LIMIT 50",
+      "oracle_result": [
+        {
+          "customer_id": "C004203",
+          "orders": 25,
+          "revenue": "46232.092300"
+        },
+        {
+          "customer_id": "C007838",
+          "orders": 16,
+          "revenue": "38946.172700"
+        },
+        {
+          "customer_id": "C005190",
+          "orders": 10,
+          "revenue": "38291.771400"
+        },
+        {
+          "customer_id": "C006652",
+          "orders": 20,
+          "revenue": "37542.673400"
+        },
+        {
+          "customer_id": "C002074",
+          "orders": 21,
+          "revenue": "36125.692000"
+        },
+        {
+          "customer_id": "C005074",
+          "orders": 15,
+          "revenue": "32808.283800"
+        },
+        {
+          "customer_id": "C003399",
+          "orders": 25,
+          "revenue": "31794.276700"
+        },
+        {
+          "customer_id": "C002210",
+          "orders": 14,
+          "revenue": "30425.132500"
+        },
+        {
+          "customer_id": "C003340",
+          "orders": 11,
+          "revenue": "30223.487600"
+        },
+        {
+          "customer_id": "C001788",
+          "orders": 15,
+          "revenue": "30002.139000"
+        },
+        {
+          "customer_id": "C004630",
+          "orders": 22,
+          "revenue": "28767.827800"
+        },
+        {
+          "customer_id": "C004864",
+          "orders": 11,
+          "revenue": "28031.847700"
+        },
+        {
+          "customer_id": "C002255",
+          "orders": 11,
+          "revenue": "27955.112800"
+        },
+        {
+          "customer_id": "C001856",
+          "orders": 24,
+          "revenue": "27825.208300"
+        },
+        {
+          "customer_id": "C007369",
+          "orders": 9,
+          "revenue": "27541.247200"
+        },
+        {
+          "customer_id": "C001124",
+          "orders": 6,
+          "revenue": "26322.618800"
+        },
+        {
+          "customer_id": "C006736",
+          "orders": 6,
+          "revenue": "26302.076600"
+        },
+        {
+          "customer_id": "C002849",
+          "orders": 10,
+          "revenue": "25803.133800"
+        },
+        {
+          "customer_id": "C005608",
+          "orders": 9,
+          "revenue": "25448.376000"
+        },
+        {
+          "customer_id": "C002993",
+          "orders": 14,
+          "revenue": "25241.517600"
+        },
+        {
+          "customer_id": "C002547",
+          "orders": 15,
+          "revenue": "25154.311500"
+        },
+        {
+          "customer_id": "C006205",
+          "orders": 11,
+          "revenue": "24504.747900"
+        },
+        {
+          "customer_id": "C008689",
+          "orders": 10,
+          "revenue": "24192.162300"
+        },
+        {
+          "customer_id": "C000364",
+          "orders": 17,
+          "revenue": "24177.023200"
+        },
+        {
+          "customer_id": "C001062",
+          "orders": 8,
+          "revenue": "24089.194300"
+        },
+        {
+          "customer_id": "C003686",
+          "orders": 13,
+          "revenue": "23956.592600"
+        },
+        {
+          "customer_id": "C000321",
+          "orders": 11,
+          "revenue": "23167.371600"
+        },
+        {
+          "customer_id": "C005249",
+          "orders": 12,
+          "revenue": "23153.861400"
+        },
+        {
+          "customer_id": "C008812",
+          "orders": 9,
+          "revenue": "23007.824200"
+        },
+        {
+          "customer_id": "C002636",
+          "orders": 12,
+          "revenue": "22882.493400"
+        },
+        {
+          "customer_id": "C006629",
+          "orders": 14,
+          "revenue": "22655.137000"
+        },
+        {
+          "customer_id": "C004526",
+          "orders": 12,
+          "revenue": "22513.285100"
+        },
+        {
+          "customer_id": "C003902",
+          "orders": 7,
+          "revenue": "22489.777000"
+        },
+        {
+          "customer_id": "C006863",
+          "orders": 15,
+          "revenue": "22189.923800"
+        },
+        {
+          "customer_id": "C003185",
+          "orders": 8,
+          "revenue": "21992.096700"
+        },
+        {
+          "customer_id": "C004563",
+          "orders": 10,
+          "revenue": "21890.324300"
+        },
+        {
+          "customer_id": "C008066",
+          "orders": 15,
+          "revenue": "21756.766600"
+        },
+        {
+          "customer_id": "C000650",
+          "orders": 10,
+          "revenue": "21496.385900"
+        },
+        {
+          "customer_id": "C005441",
+          "orders": 8,
+          "revenue": "21495.842000"
+        },
+        {
+          "customer_id": "C005373",
+          "orders": 7,
+          "revenue": "21320.168200"
+        },
+        {
+          "customer_id": "C003841",
+          "orders": 5,
+          "revenue": "21285.387200"
+        },
+        {
+          "customer_id": "C007060",
+          "orders": 16,
+          "revenue": "21202.339100"
+        },
+        {
+          "customer_id": "C002876",
+          "orders": 8,
+          "revenue": "20991.012200"
+        },
+        {
+          "customer_id": "C008873",
+          "orders": 8,
+          "revenue": "20957.291000"
+        },
+        {
+          "customer_id": "C005935",
+          "orders": 15,
+          "revenue": "20897.772200"
+        },
+        {
+          "customer_id": "C005602",
+          "orders": 15,
+          "revenue": "20614.936700"
+        },
+        {
+          "customer_id": "C004809",
+          "orders": 12,
+          "revenue": "20602.270200"
+        },
+        {
+          "customer_id": "C002973",
+          "orders": 10,
+          "revenue": "20237.751800"
+        },
+        {
+          "customer_id": "C004619",
+          "orders": 6,
+          "revenue": "20198.681300"
+        },
+        {
+          "customer_id": "C002016",
+          "orders": 8,
+          "revenue": "19831.436900"
+        }
+      ],
+      "sql": {
+        "median_ms": 2.666,
+        "p90_ms": 2.962
+      },
+      "mocked_api_cache_miss": {
+        "median_ms": 3.661,
+        "p90_ms": 4.143
+      },
+      "mocked_api_cache_hit": {
+        "median_ms": 0.628,
+        "p90_ms": 0.827
+      },
+      "mocked_groq": {
+        "median_ms": 0.009,
+        "p90_ms": 0.011
+      }
+    },
+    {
+      "case": "profit_margin",
+      "question": "Profit margins by region",
+      "oracle_sql": "SELECT region,SUM(profit) AS profit,100*SUM(profit)/NULLIF(SUM(revenue),0) AS margin_pct FROM sales_with_revenue GROUP BY region ORDER BY region",
+      "oracle_result": [
+        {
+          "region": "APAC",
+          "profit": "1233251.92",
+          "margin_pct": 13.77463114407531
+        },
+        {
+          "region": "EMEA",
+          "profit": "998370.15",
+          "margin_pct": 12.586682329488754
+        },
+        {
+          "region": "NA",
+          "profit": "859227.06",
+          "margin_pct": 13.30863273561966
+        }
+      ],
+      "sql": {
+        "median_ms": 1.423,
+        "p90_ms": 1.454
+      },
+      "mocked_api_cache_miss": {
+        "median_ms": 2.049,
+        "p90_ms": 2.068
+      },
+      "mocked_api_cache_hit": {
+        "median_ms": 0.532,
+        "p90_ms": 0.561
+      },
+      "mocked_groq": {
+        "median_ms": 0.008,
+        "p90_ms": 0.009
+      }
+    }
+  ]
+}

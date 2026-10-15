@@ -129,7 +129,7 @@ queries:
     tier: 3
     category: "Hard"
     split: "dev"
-    question: "List orders whose revenue beat the average order"
+    question: "List the top 50 orders whose revenue beat the average order"
     oracle_sql: |
       WITH order_revs AS (
         SELECT order_id, SUM(quantity * unit_price * (1 - discount)) as rev
@@ -141,6 +141,8 @@ queries:
       SELECT o.order_id, o.rev 
       FROM order_revs o, avg_ord a
       WHERE o.rev > a.avg_rev
+      ORDER BY o.rev DESC, o.order_id
+      LIMIT 50
   - id: "T3.4"
     tier: 3
     category: "Hard"
@@ -178,12 +180,14 @@ queries:
     tier: 3
     category: "Hard"
     split: "dev"
-    question: "Which customers ordered more than once and what did they spend?"
+    question: "Which top 50 customers ordered more than once and what did they spend?"
     oracle_sql: |
       SELECT customer_id, COUNT(DISTINCT order_id) as orders, SUM(quantity * unit_price * (1 - discount)) as spent
       FROM sales_data
       GROUP BY customer_id
       HAVING COUNT(DISTINCT order_id) > 1
+      ORDER BY spent DESC, customer_id
+      LIMIT 50
   - id: "T3.8"
     tier: 3
     category: "Hard"

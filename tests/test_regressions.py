@@ -17,14 +17,19 @@ from tests.eval.run_eval import compare_results, normalize_result
 
 class QueryGuardTests(unittest.TestCase):
     def test_read_only_query_still_works(self):
-        rows, _ = execute_sql("WITH orders AS (SELECT order_id FROM sales_data) SELECT COUNT(*) AS n FROM orders")
-        self.assertEqual(rows[0]["n"], 10)
+        rows, _ = execute_sql(
+            "WITH orders AS (SELECT order_id FROM sales_data) SELECT COUNT(*) AS n FROM orders"
+        )
+        self.assertEqual(rows[0]["n"], 50000)
 
     def test_write_and_multiple_statements_are_rejected(self):
         for sql in ("DELETE FROM sales_data", "SELECT 1; DELETE FROM sales_data"):
             with self.subTest(sql=sql), self.assertRaises(PermissionError):
                 execute_sql(sql)
-        self.assertEqual(get_connection().execute("SELECT COUNT(*) FROM sales_data").fetchone()[0], 10)
+        self.assertEqual(
+            get_connection().execute("SELECT COUNT(*) FROM sales_data").fetchone()[0],
+            50000,
+        )
 
     def test_select_cannot_read_local_files(self):
         with self.assertRaises(Exception):
@@ -33,8 +38,8 @@ class QueryGuardTests(unittest.TestCase):
 
 class EvalComparisonTests(unittest.TestCase):
     def test_numeric_scalar_string_gets_full_credit(self):
-        oracle = normalize_result([(6134.4,)])
-        api = normalize_result("6134.4")
+        oracle = normalize_result([(23341186.389,)])
+        api = normalize_result("23341186.389")
         self.assertEqual(compare_results(oracle, api), 45)
 
     def test_empty_result_is_empty(self):
@@ -42,7 +47,9 @@ class EvalComparisonTests(unittest.TestCase):
 
     def test_extra_justifying_column_gets_partial_credit(self):
         oracle = normalize_result([("Technology", 88.06)])
-        api = normalize_result([{"product_category": "Technology", "revenue": 5402, "share_pct": 88.06}])
+        api = normalize_result(
+            [{"product_category": "Technology", "revenue": 5402, "share_pct": 88.06}]
+        )
         self.assertEqual(compare_results(oracle, api), 30)
 
     def test_values_attached_to_wrong_rows_are_not_nearly_correct(self):
@@ -72,8 +79,12 @@ class RetryTests(unittest.TestCase):
         class RateLimit(Exception):
             status_code = 429
 
-        with patch("app.engine.generate_sql", side_effect=RateLimit("provider details")) as generate:
-            result = _self_correct_loop("Total sales", "system prompt", model="openai/gpt-oss-120b")
+        with patch(
+            "app.engine.generate_sql", side_effect=RateLimit("provider details")
+        ) as generate:
+            result = _self_correct_loop(
+                "Total sales", "system prompt", model="openai/gpt-oss-120b"
+            )
         self.assertEqual(generate.call_count, 1)
         self.assertEqual(result.attempt_number, 1)
         self.assertNotIn("provider details", result.error)
@@ -82,34 +93,50 @@ class RetryTests(unittest.TestCase):
         class AuthenticationError(Exception):
             status_code = 401
 
-        with patch("app.engine.generate_sql", side_effect=AuthenticationError("bad credential")) as generate:
-            result = _self_correct_loop("Total sales", "prompt", model="openai/gpt-oss-120b", api_key="fake-user-key")
+        with patch(
+            "app.engine.generate_sql", side_effect=AuthenticationError("bad credential")
+        ) as generate:
+            result = _self_correct_loop(
+                "Total sales",
+                "prompt",
+                model="openai/gpt-oss-120b",
+                api_key="fake-user-key",
+            )
         self.assertEqual(generate.call_count, 1)
         self.assertNotIn("bad credential", result.error)
 
 
 class UserKeyTests(unittest.TestCase):
-    def test_query_route_passes_key_without_echoing_it(self):
+    def test_demo_rejects_browser_key_without_echoing_it(self):
         response = QueryResponse(
-            query="Total sales", generated_sql="SELECT 1", generated_logic="one",
-            result="1", confidence_score=0.9, explanation="one",
+            query="Total sales",
+            generated_sql="SELECT 1",
+            generated_logic="one",
+            result="1",
+            confidence_score=0.9,
+            explanation="one",
         )
         with patch("app.server.process_query", return_value=response) as process:
             result = TestClient(create_app()).post(
                 "/api/query",
                 json={"query": "Total sales", "api_key": "fake-user-key"},
             )
-        self.assertEqual(result.status_code, 200)
-        process.assert_called_once_with("Total sales", model=None, api_key="fake-user-key")
+        self.assertEqual(result.status_code, 422)
+        process.assert_not_called()
         self.assertNotIn("fake-user-key", result.text)
 
     def test_supplied_key_uses_request_client(self):
-        with patch("app.llm.Groq") as client_factory, patch("app.llm._get_client") as server_client:
-            client_factory.return_value.chat.completions.create.return_value.choices[0].message.content = (
-                '{"logic":"one", "sql":"SELECT 1", "explanation":"one", "confidence":0.9}'
-            )
+        with (
+            patch("app.llm.Groq") as client_factory,
+            patch("app.llm._get_client") as server_client,
+        ):
+            client_factory.return_value.chat.completions.create.return_value.choices[
+                0
+            ].message.content = '{"logic":"one", "sql":"SELECT 1", "explanation":"one", "confidence":0.9}'
             generate_sql("prompt", "question", api_key="fake-user-key")
-        client_factory.assert_called_once_with(api_key="fake-user-key")
+        client_factory.assert_called_once_with(
+            api_key="fake-user-key", timeout=20, max_retries=0
+        )
         server_client.assert_not_called()
 
     def test_cache_is_separate_for_each_key(self):
@@ -117,17 +144,23 @@ class UserKeyTests(unittest.TestCase):
         success = _LoopResult(
             success=True,
             llm_output=LLMGeneratedOutput(
-                sql="SELECT 1", logic="one", explanation="one", confidence=0.9,
+                sql="SELECT 1",
+                logic="one",
+                explanation="one",
+                confidence=0.9,
             ),
-            rows=[{"answer": 1}], columns=["answer"], attempt_number=1,
+            rows=[{"answer": 1}],
+            columns=["answer"],
+            attempt_number=1,
         )
         try:
             with (
-                patch("app.engine.build_feedback_context", return_value=""),
                 patch("app.engine.build_system_prompt", return_value="prompt"),
                 patch("app.engine.get_data_version", return_value="snapshot"),
                 patch("app.engine.append_entry"),
-                patch("app.engine._self_correct_loop", return_value=success) as generate,
+                patch(
+                    "app.engine._self_correct_loop", return_value=success
+                ) as generate,
             ):
                 process_query("Total sales", api_key="fake-key-a")
                 process_query("Total sales", api_key="fake-key-b")
@@ -164,11 +197,15 @@ class ResponseCacheTests(unittest.TestCase):
 
     def test_repeat_skips_generation_but_prompt_change_invalidates(self):
         with (
-            patch("app.engine.build_feedback_context", return_value=""),
-            patch("app.engine.build_system_prompt", side_effect=["prompt-v1", "prompt-v1", "prompt-v2"]),
+            patch(
+                "app.engine.build_system_prompt",
+                side_effect=["prompt-v1", "prompt-v1", "prompt-v2"],
+            ),
             patch("app.engine.get_data_version", return_value="snapshot"),
             patch("app.engine.append_entry"),
-            patch("app.engine._self_correct_loop", return_value=self._success()) as generate,
+            patch(
+                "app.engine._self_correct_loop", return_value=self._success()
+            ) as generate,
         ):
             first = process_query("Total sales")
             repeat = process_query(" Total   sales ")
@@ -184,7 +221,6 @@ class ResponseCacheTests(unittest.TestCase):
     def test_failed_request_is_not_cached(self):
         failure = _LoopResult(error="generation failed", attempt_number=1)
         with (
-            patch("app.engine.build_feedback_context", return_value=""),
             patch("app.engine.build_system_prompt", return_value="prompt"),
             patch("app.engine.get_data_version", return_value="snapshot"),
             patch("app.engine.append_entry"),

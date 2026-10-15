@@ -1,5 +1,7 @@
 # Evaluation trace and improvement history
 
+> Archived context: this document concerns the original small dataset and earlier application. Its scores and operational instructions are not current validation. See [current evaluation](EVALUATION_CURRENT.md) for the 50,000-line synthetic dataset.
+
 This document connects the original test campaign, the prompt and code revisions, and the saved evaluation traces. It distinguishes **measured results**, **manual review**, and **planned checks** so a reader can follow the evidence without treating every score as directly comparable.
 
 ## At a glance

@@ -1,5 +1,7 @@
 # Test Plan — Iterative Hard-Query Evaluation & Prompt Tuning
 
+> Archived context: this document concerns the original small dataset and earlier application. Its scores and operational instructions are not current validation. See [current evaluation](EVALUATION_CURRENT.md) for the 50,000-line synthetic dataset.
+
 **System under test:** Intelligent Analytics Query Engine (`POST /api/query`)
 **Goal:** Measure how well the NL → SQL pipeline handles *hard* analytical questions, fix
 weaknesses by improving the prompt (not by hardcoding answers), prove each fix worked, and

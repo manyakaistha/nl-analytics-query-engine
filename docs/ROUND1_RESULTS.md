@@ -1,5 +1,7 @@
 # Test Campaign Results: Round 1 (Prompt Tuning)
 
+> Archived context: this document concerns the original small dataset and earlier application. Its scores and operational instructions are not current validation. See [current evaluation](EVALUATION_CURRENT.md) for the 50,000-line synthetic dataset.
+
 > **Historical report.** This records the early 27-question R1 run and its original interpretation. Its scorer mishandled numeric scalar responses, and T4.6 executed a `DELETE` that changed the shared database for later cases. The run stopped before T4.11–T4.13. For the reconciled stage comparison, charts, fixes and complete 30-question run, use [Evaluation trace and improvement history](EVALUATION_TRACE.md).
 
 I completed the prompt engineering phase and evaluated the model on the expanded 30-query catalog. 

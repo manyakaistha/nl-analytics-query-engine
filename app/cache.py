@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from collections import OrderedDict
 from threading import Lock
 
@@ -13,6 +14,7 @@ from app.models import QueryResponse
 
 _entries: OrderedDict[str, QueryResponse] = OrderedDict()
 _lock = Lock()
+_expiry = {}
 
 
 def make_cache_key(
@@ -42,6 +44,10 @@ def make_cache_key(
 def get_cached_response(key: str, question: str) -> QueryResponse | None:
     with _lock:
         saved = _entries.get(key)
+        if saved is not None and _expiry.get(key, 0) < time.monotonic():
+            _entries.pop(key, None)
+            _expiry.pop(key, None)
+            saved = None
         if saved is None:
             return None
         _entries.move_to_end(key)
@@ -60,6 +66,8 @@ def cache_response(key: str, response: QueryResponse) -> None:
         return
     with _lock:
         _entries[key] = response.model_copy(deep=True)
+        _expiry[key] = time.monotonic() + 900
         _entries.move_to_end(key)
         while len(_entries) > QUERY_CACHE_MAX_ENTRIES:
-            _entries.popitem(last=False)
+            old_key, _ = _entries.popitem(last=False)
+            _expiry.pop(old_key, None)

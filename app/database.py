@@ -1,115 +1,169 @@
-"""
-DuckDB connection manager — loads processed CSVs into in-memory tables.
-"""
+"""One bounded DuckDB executor; trusted loading is separate from untrusted SQL."""
 
 from __future__ import annotations
-
-import hashlib
-
+import json
+import threading
+import time
 import duckdb
+import sqlglot
+from sqlglot import exp
+from sqlglot.optimizer.scope import traverse_scope
+from app.config import (
+    RAW_DATA_DIR,
+    MAX_RESULT_ROWS,
+    MAX_RESULT_BYTES,
+    SQL_TIMEOUT_SECONDS,
+    DUCKDB_MEMORY_MB,
+)
+from scripts.validate_data import validate_data
 
-from app.config import DATA_DIR
-from scripts.preprocess import ensure_processed_data
+_connection = None
+_data_version = None
+_profile = None
+_lock = threading.RLock()
+TABLES = {"sales_data", "targets", "sales_with_revenue"}
+FUNCTIONS = set(
+    "AND OR SUM COUNT AVG MIN MAX COALESCE NULLIF ROUND ABS FLOOR CEIL CEILING UPPER LOWER TRIM LENGTH SUBSTRING REPLACE CONCAT CONCAT_WS CAST TRY_CAST EXTRACT STRFTIME DATE_TRUNC DATE_PART DATE_DIFF DATEDIFF DATE_ADD LAST_DAY DAY MONTH YEAR RANK DENSE_RANK ROW_NUMBER LAG LEAD FIRST_VALUE LAST_VALUE NTILE PERCENT_RANK CUME_DIST STRING_AGG GROUP_CONCAT GREATEST LEAST IF CASE TIME_TO_STR TS_OR_DS_TO_DATE CURRENT_DATE".split()
+)
 
 
-# Module-level connection (singleton per process)
-_connection: duckdb.DuckDBPyConnection | None = None
-_data_version: str | None = None
-
-
-def get_connection() -> duckdb.DuckDBPyConnection:
-    """Return the shared in-memory DuckDB connection, initializing on first call."""
+def get_connection():
     global _connection
-    if _connection is None:
-        _connection = _init_database()
-    return _connection
+    with _lock:
+        if _connection is None:
+            _connection = _init_database()
+        return _connection
 
 
-def get_data_version() -> str:
-    """Identify the CSV snapshot loaded into the current in-memory database."""
-    get_connection()
-    assert _data_version is not None
-    return _data_version
-
-
-def _init_database() -> duckdb.DuckDBPyConnection:
-    """
-    Create an in-memory DuckDB connection and load the processed CSV files
-    as permanent tables.
-    """
-    global _data_version
-    ensure_processed_data()
-    con = duckdb.connect(database=":memory:")
-
-    sales_path = DATA_DIR / "sales_data.csv"
-    targets_path = DATA_DIR / "targets.csv"
-    digest = hashlib.sha256()
-    for path in (sales_path, targets_path):
-        digest.update(path.name.encode("utf-8"))
-        with path.open("rb") as source:
-            for chunk in iter(lambda: source.read(1024 * 1024), b""):
-                digest.update(chunk)
-
-    con.execute(f"""
-        CREATE TABLE sales_data AS
-        SELECT * FROM read_csv_auto('{sales_path}', header=true)
-    """)
-
-    con.execute(f"""
-        CREATE TABLE targets AS
-        SELECT * FROM read_csv_auto('{targets_path}', header=true)
-    """)
-
-    # Create a convenience view with the revenue metric pre-computed
-    con.execute("""
-        CREATE VIEW sales_with_revenue AS
-        SELECT
-            *,
-            quantity * unit_price * (1 - discount) AS revenue,
-            STRFTIME(order_date, '%Y-%m') AS order_month
-        FROM sales_data
-    """)
-
-    _verify_tables(con)
-    # The statement-type check below does not stop SELECT * FROM read_csv_auto(...)
-    # or similar table functions from reading arbitrary local files. Loading is
-    # complete, so prevent query-time access to files and remote resources.
-    con.execute("SET enable_external_access = false")
-    _data_version = digest.hexdigest()
+def _init_database():
+    global _data_version, _profile
+    _profile = validate_data()
+    con = duckdb.connect(
+        ":memory:",
+        config={
+            "threads": 1,
+            "memory_limit": f"{DUCKDB_MEMORY_MB}MB",
+            "max_temp_directory_size": "0B",
+        },
+    )
+    # Explicit decimal types keep monetary calculations reproducible.
+    con.execute(
+        "CREATE TABLE sales_data AS SELECT * FROM read_csv(?, header=true, types={'order_date':'DATE','quantity':'INTEGER','unit_price':'DECIMAL(14,2)','discount':'DECIMAL(5,4)','shipping_cost':'DECIMAL(14,2)','profit':'DECIMAL(14,2)'})",
+        [str(RAW_DATA_DIR / "sales_data.csv")],
+    )
+    con.execute(
+        "CREATE TABLE targets AS SELECT * FROM read_csv(?, header=true, types={'month':'VARCHAR','target_revenue':'DECIMAL(16,2)'})",
+        [str(RAW_DATA_DIR / "targets.csv")],
+    )
+    con.execute(
+        "CREATE VIEW sales_with_revenue AS SELECT *, quantity * unit_price * (1-discount) AS revenue, strftime(order_date, '%Y-%m') AS order_month FROM sales_data"
+    )
+    con.execute("SET enable_external_access=false")
+    con.execute("SET lock_configuration=true")
+    _data_version = _profile["dataset_version"]
     return con
 
 
-def _verify_tables(con: duckdb.DuckDBPyConnection) -> None:
-    """Print table info at startup for debugging."""
-    for table in ["sales_data", "targets", "sales_with_revenue"]:
-        try:
-            count = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-            cols = [
-                row[0]
-                for row in con.execute(f"DESCRIBE {table}").fetchall()
-            ]
-            print(f"  ✓ {table}: {count} rows, columns={cols}")
-        except Exception as exc:
-            print(f"  ✗ {table}: {exc}")
+def get_data_version():
+    get_connection()
+    return _data_version
 
 
-def execute_sql(sql: str) -> tuple[list[dict], list[str]]:
-    """
-    Execute a SQL query against DuckDB and return (rows_as_dicts, column_names).
-    Raises duckdb.Error on invalid SQL, and PermissionError on anything other
-    than a single read-only SELECT statement.
-    """
-    con = get_connection()
+def get_profile():
+    get_connection()
+    return dict(_profile)
 
-    # Read-only guard: the prompt forbids writes, but never trust the model alone
-    statements = con.extract_statements(sql)
-    if len(statements) != 1 or statements[0].type != duckdb.StatementType.SELECT:
-        kinds = ", ".join(s.type.name for s in statements) or "none"
-        raise PermissionError(
-            f"Read-only violation: only a single SELECT statement is allowed (got: {kinds})."
+
+def close_database():
+    global _connection
+    with _lock:
+        if _connection is not None:
+            _connection.close()
+            _connection = None
+
+
+def validate_sql(sql: str) -> str:
+    if len(sql) > 12000:
+        raise PermissionError("SQL is too long")
+    try:
+        statements = sqlglot.parse(sql, read="duckdb")
+    except sqlglot.errors.ParseError:
+        raise PermissionError("Invalid SQL syntax") from None
+    if len(statements) != 1 or not isinstance(
+        statements[0], (exp.Select, exp.Union, exp.Intersect, exp.Except)
+    ):
+        raise PermissionError("Read-only violation: only a single SELECT is allowed")
+    tree = statements[0]
+    forbidden = (
+        exp.Command,
+        exp.DDL,
+        exp.DML,
+        exp.Into,
+        exp.Lock,
+        exp.Parameter,
+        exp.Placeholder,
+    )
+    for node in tree.walk():
+        if isinstance(node, forbidden) or (
+            isinstance(node, exp.With) and node.args.get("recursive")
+        ):
+            raise PermissionError("Unsupported SQL operation")
+        if isinstance(node, exp.Func):
+            name = (
+                node.name.upper()
+                if isinstance(node, exp.Anonymous)
+                else node.sql_name()
+            )
+            if name not in FUNCTIONS:
+                raise PermissionError("Unsupported SQL function")
+        if isinstance(node, exp.Table):
+            if not isinstance(node.this, exp.Identifier) or node.db or node.catalog:
+                raise PermissionError(
+                    "External tables and table functions are disabled"
+                )
+    for scope in traverse_scope(tree):
+        for source in scope.sources.values():
+            if isinstance(source, exp.Table) and source.name.lower() not in TABLES:
+                raise PermissionError("Query references an unapproved table")
+    return tree.sql(dialect="duckdb").rstrip(";")
+
+
+def execute_sql(sql: str, timings: dict | None = None) -> tuple[list[dict], list[str]]:
+    validation_start = time.perf_counter()
+    safe_sql = validate_sql(sql)
+    if timings is not None:
+        timings["sql_validation"] = timings.get("sql_validation", 0) + round(
+            (time.perf_counter() - validation_start) * 1000, 3
         )
-
-    result = con.execute(sql)
-    columns = [desc[0] for desc in result.description]
-    rows = [dict(zip(columns, row)) for row in result.fetchall()]
-    return rows, columns
+    with _lock:
+        execution_start = time.perf_counter()
+        con = get_connection()
+        # Only this query owns the connection until its timer is cancelled AND joined.
+        timer = threading.Timer(SQL_TIMEOUT_SECONDS, con.interrupt)
+        timer.daemon = True
+        timer.start()
+        try:
+            result = con.execute(
+                f"SELECT * FROM ({safe_sql}) AS bounded_result LIMIT {MAX_RESULT_ROWS + 1}"
+            )
+            columns = [d[0] for d in result.description]
+            if len(columns) > 40:
+                raise PermissionError("Too many result columns")
+            raw = result.fetchmany(MAX_RESULT_ROWS + 1)
+            if len(raw) > MAX_RESULT_ROWS:
+                raise PermissionError(
+                    f"Result exceeds {MAX_RESULT_ROWS} rows; use a filter or LIMIT"
+                )
+            rows = [dict(zip(columns, row)) for row in raw]
+            if len(json.dumps(rows, default=str).encode()) > MAX_RESULT_BYTES:
+                raise PermissionError(
+                    "Result is too large; select fewer columns or rows"
+                )
+            return rows, columns
+        finally:
+            timer.cancel()
+            timer.join()
+            if timings is not None:
+                timings["duckdb_execution"] = timings.get(
+                    "duckdb_execution", 0
+                ) + round((time.perf_counter() - execution_start) * 1000, 3)
